@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pattern Trainer</title>
+    <link rel="shortcut icon" href="./assets/images/logo-wheat.png">
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="logo">
+                <a href="https://melopoiia.com/" id="logo-link" aria-label="Melopoiia">
+                    <img src="./assets/images/logo-wheat.png" alt="Melopoiia Logo">
+                </a>
+            </div>
+            <h1 class="title">Pattern Trainer</h1>
+            <button class="menu-btn" aria-label="Menue oeffnen">☰</button>
+        </header>
+
+        <main class="app-main" aria-label="Pattern Trainer Inhalt">
+            <section class="panel-grid">
+                <article class="panel panel--instructions" aria-labelledby="panel-instructions">
+                    <header class="panel-header">
+                        <h2 id="panel-instructions">Anweisungen</h2>
+                        <p class="panel-subtitle">So nutzt du den Pattern Trainer.</p>
+                    </header>
+                    <div class="panel-content">
+                        <ol class="instruction-list">
+                            <li>Hoere dir ein Pattern an oder lies die Vorlage im naechsten Fenster.</li>
+                            <li>Analysiere Intervalle und Rhythmus. Notiere markante Merkmale.</li>
+                            <li>Spiele oder singe das Pattern nach und notiere deine Loesung unter "Meine Uebung".</li>
+                        </ol>
+                        <div class="cta-row">
+                            <button class="btn primary" type="button">Pattern abspielen</button>
+                            <button class="btn ghost" type="button">Pattern ueberspringen</button>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel panel--practice" aria-labelledby="panel-practice">
+                    <header class="panel-header">
+                        <h2 id="panel-practice">Meine Uebung</h2>
+                        <p class="panel-subtitle">Notiere deine Notation oder Beobachtungen.</p>
+                    </header>
+                    <div class="panel-content">
+                        <section class="recording-summary" aria-live="polite">
+                            <div class="recording-summary__header">
+                                <h3>Letzte Aufnahme</h3>
+                                <button id="practicePlay" class="btn ghost small" type="button" disabled>Abspielen</button>
+                            </div>
+                            <p id="recordingSummaryText">Noch keine Aufnahme.</p>
+                        </section>
+                        <label class="label" for="practice-notes">Notizen</label>
+                        <textarea id="practice-notes" name="practice-notes" rows="4"
+                            placeholder="Beschreibe das Pattern, notiere Fingerings oder Rhythmusmarken."></textarea>
+                        <div class="cta-row">
+                            <button class="btn accent" type="button">Speichern</button>
+                            <button class="btn ghost" type="button">Zuruecksetzen</button>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel panel--templates" aria-labelledby="panel-templates">
+                    <header class="panel-header">
+                        <h2 id="panel-templates">Vorlagen</h2>
+                        <p class="panel-subtitle">Waehle eine Struktur als Ausgangspunkt.</p>
+                    </header>
+                    <div class="panel-content">
+                        <div class="template-grid">
+                            <button class="template-card" type="button" aria-label="Vorlage pentatonisch">
+                                <span class="template-name">Pentatonisch</span>
+                                <span class="template-detail">1 - 2 - 3 - 5 - 6</span>
+                            </button>
+                            <button class="template-card" type="button" aria-label="Vorlage Sequenz">
+                                <span class="template-name">Sequenz</span>
+                                <span class="template-detail">aufwaerts, dann Sequenzierung</span>
+                            </button>
+                            <button class="template-card" type="button" aria-label="Vorlage Riff">
+                                <span class="template-name">Riff</span>
+                                <span class="template-detail">Syncopierter Groove</span>
+                            </button>
+                            <button class="template-card" type="button" aria-label="Vorlage Kadenz">
+                                <span class="template-name">Kadenz</span>
+                                <span class="template-detail">I - vi - ii - V</span>
+                            </button>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel panel--metronome" aria-labelledby="panel-metronome">
+                    <header class="panel-header">
+                        <h2 id="panel-metronome">Metronom</h2>
+                        <p class="panel-subtitle">Halte dein Tempo waehrend der Aufnahme stabil.</p>
+                    </header>
+                    <div class="panel-content">
+                        <div class="metronome-fields">
+                            <label class="field">
+                                <span class="field-label">BPM</span>
+                                <input id="metronomeBpm" type="number" min="30" max="220" value="96" />
+                            </label>
+                            <label class="field">
+                                <span class="field-label">Beats/Takt</span>
+                                <input id="metronomeBeats" type="number" min="1" max="12" value="4" />
+                            </label>
+                            <label class="field">
+                                <span class="field-label">Sound</span>
+                                <select id="metronomeSound">
+                                    <option value="click" selected>Click</option>
+                                    <option value="kick">Kick</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="metronome-actions">
+                            <button id="metronomeToggle" class="btn ghost" type="button">Start</button>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            <section class="keyboard-area" aria-label="Keyboardaufnahme">
+                <article class="panel keyboard-panel" aria-labelledby="panel-keyboard">
+                    <header class="panel-header">
+                        <h2 id="panel-keyboard">Keyboard &amp; Aufnahme</h2>
+                        <p class="panel-subtitle">Spiele Patterns ein, hoere sie zurueck und sichere Vorlagen.</p>
+                    </header>
+                    <div class="panel-content keyboard-content">
+                        <div id="trainerKeyboard" class="keyboard" role="application"
+                            aria-label="Klaviertastatur (C3-B4)"></div>
+                        <div class="recording-controls">
+                            <div class="recording-primary">
+                                <button id="recordBtn" class="btn accent" type="button">Aufnahme</button>
+                                <button id="stopBtn" class="btn ghost" type="button" disabled>Stopp</button>
+                                <button id="playBtn" class="btn primary" type="button" disabled>Abspielen</button>
+                            </div>
+                            <div class="recording-secondary">
+                                <label class="field sr-only" for="templateName">Vorlagenname</label>
+                                <input id="templateName" type="text" placeholder="Vorlage benennen" autocomplete="off" />
+                                <button id="saveBtn" class="btn ghost" type="button" disabled>Als Vorlage speichern</button>
+                                <button id="deleteBtn" class="btn danger" type="button" disabled>Loeschen</button>
+                            </div>
+                        </div>
+                        <p id="recordingStatus" class="recording-status">Bereit fuer Aufnahme.</p>
+                    </div>
+                </article>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <small>&copy; Melopoiia - Trainingsprototyp</small>
+        </footer>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>
