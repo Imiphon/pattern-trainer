@@ -34,10 +34,6 @@
                             <li>Analysiere Intervalle und Rhythmus. Notiere markante Merkmale.</li>
                             <li>Spiele oder singe das Pattern nach und notiere deine Loesung unter "Meine Uebung".</li>
                         </ol>
-                        <div class="cta-row">
-                            <button class="btn primary" type="button">Pattern abspielen</button>
-                            <button class="btn ghost" type="button">Pattern ueberspringen</button>
-                        </div>
                     </div>
                 </article>
 
@@ -54,17 +50,15 @@
                             </div>
                             <p id="recordingSummaryText">Noch keine Aufnahme.</p>
                         </section>
-                        <label class="label" for="practice-notes">Notizen</label>
-                        <textarea id="practice-notes" name="practice-notes" rows="4"
-                            placeholder="Beschreibe das Pattern, notiere Fingerings oder Rhythmusmarken."></textarea>
+                        
                         <div class="cta-row">
-                            <button class="btn accent" type="button">Speichern</button>
-                            <button class="btn ghost" type="button">Zuruecksetzen</button>
+                            <button class="btn accent down-mid" type="button">Pattern üben</button>
                         </div>
                     </div>
                 </article>
 
-                <article class="panel panel--templates" aria-labelledby="panel-templates">
+                <article class="panel">
+                    <article class="panel panel--templates" aria-labelledby="panel-templates">
                     <header class="panel-header">
                         <h2 id="panel-templates">Vorlagen</h2>
                         <p class="panel-subtitle">Waehle eine Struktur als Ausgangspunkt.</p>
@@ -119,30 +113,32 @@
                         </div>
                     </div>
                 </article>
+                </article>
             </section>
+
+            <p class="orientation-hint" role="status">Bitte im Querformat verwenden, um alle Panels optimal zu sehen.</p>
 
             <section class="keyboard-area" aria-label="Keyboardaufnahme">
                 <article class="panel keyboard-panel" aria-labelledby="panel-keyboard">
                     <header class="panel-header">
                         <h2 id="panel-keyboard">Keyboard &amp; Aufnahme</h2>
-                        <p class="panel-subtitle">Spiele Patterns ein, hoere sie zurueck und sichere Vorlagen.</p>
+                        
                     </header>
-                    <div class="panel-content keyboard-content">
-                        <div id="trainerKeyboard" class="keyboard" role="application"
-                            aria-label="Klaviertastatur (C3-B4)"></div>
                         <div class="recording-controls">
                             <div class="recording-primary">
                                 <button id="recordBtn" class="btn accent" type="button">Aufnahme</button>
                                 <button id="stopBtn" class="btn ghost" type="button" disabled>Stopp</button>
                                 <button id="playBtn" class="btn primary" type="button" disabled>Abspielen</button>
-                            </div>
-                            <div class="recording-secondary">
+                           
                                 <label class="field sr-only" for="templateName">Vorlagenname</label>
                                 <input id="templateName" type="text" placeholder="Vorlage benennen" autocomplete="off" />
                                 <button id="saveBtn" class="btn ghost" type="button" disabled>Als Vorlage speichern</button>
                                 <button id="deleteBtn" class="btn danger" type="button" disabled>Loeschen</button>
                             </div>
                         </div>
+                    <div class="panel-content keyboard-content">
+                        <div id="trainerKeyboard" class="keyboard" role="application"
+                            aria-label="Klaviertastatur (C3-B4)"></div>
                         <p id="recordingStatus" class="recording-status">Bereit fuer Aufnahme.</p>
                     </div>
                 </article>

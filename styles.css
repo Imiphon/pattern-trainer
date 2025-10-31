@@ -84,6 +84,15 @@ body {
     padding: 40px 32px 60px;
 }
 
+.orientation-hint {
+    display: none;
+    margin: 16px auto 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    max-width: 680px;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
@@ -99,35 +108,35 @@ body {
 .panel-grid {
     display: grid;
     gap: 28px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
-        "instructions practice"
-        "templates metronome";
+        "instructions practice templates"
+        ". . metronome";
 }
 
 .panel--instructions {
     grid-area: instructions;
-    height: 400px;
-    min-height: 400px;
+    max-height: 400px;
+    overflow: hidden;
 }
 
 .panel--templates {
     grid-area: templates;
-    height: 400px;
-    min-height: 400px;
+    height: 200px;
+    max-height: 200px;
+    overflow: hidden;
 }
 
 .panel--practice {
     grid-area: practice;
-    height: 200px;
-    min-height: 200px;
+    height: 400px;
+    max-height: 400px;
     overflow: auto;
 }
 
 .panel--metronome {
     grid-area: metronome;
-    height: 200px;
-    min-height: 200px;
+    max-height: 140px;
     overflow: auto;
 }
 
@@ -136,7 +145,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 24px;
     box-shadow: var(--shadow-lg);
-    padding: 28px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -166,6 +175,7 @@ body {
 }
 
 .panel-content {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -207,7 +217,7 @@ body {
 input[type="number"],
 input[type="text"],
 select {
-    width: 100%;
+    width: min-content;
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -240,9 +250,11 @@ select:focus-visible {
 }
 
 .cta-row {
+    height: min-content;
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+    justify-content: center;
 }
 
 .btn {
@@ -272,6 +284,11 @@ select:focus-visible {
     color: #0b1324;
     border: none;
     box-shadow: 0 12px 30px rgba(250, 204, 21, 0.25);
+}
+
+.down-mid {
+    position: absolute;
+    bottom: 12px;
 }
 
 .btn.accent:hover,
@@ -568,7 +585,16 @@ textarea:focus-visible {
     .panel--practice,
     .panel--metronome {
         height: auto;
-        min-height: 0;
+        max-height: none;
+    }
+
+    .panel--instructions,
+    .panel--templates {
+        overflow: visible;
+    }
+
+    .orientation-hint {
+        display: block;
     }
 }
 
