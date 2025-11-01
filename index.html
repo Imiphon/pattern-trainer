@@ -59,8 +59,26 @@
                         </section>
 
                         <div class="cta-row">
-                            <button id="practiceQueuePlay" class="btn accent" type="button" disabled>▶ Üben</button>
-                            <button id="practiceQueueClear" class="btn ghost" type="button" disabled>Zuruecksetzen</button>
+                            <label class="rep-control">
+                                <span class="field-label">Rep</span>
+                                <select id="practiceRepeats">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                </select>
+                            </label>
+                            <label class="rep-control">
+                                <span class="field-label">⏸︎</span>
+                                <select id="practicePauseBars">
+                                    <option value="0" selected>0</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                </select>
+                            </label>
+                            <button id="practiceQueuePlay" class="btn accent" type="button" disabled>▶</button>
+                            <button id="practiceQueueClear" class="btn ghost" type="button" disabled>Neu</button>
                         </div>
                     </div>
                 </article>

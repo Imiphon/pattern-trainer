@@ -43,6 +43,8 @@ const practiceHint = document.getElementById("practiceHint");
 const practiceQueueEl = document.getElementById("practiceQueue");
 const practiceQueuePlayBtn = document.getElementById("practiceQueuePlay");
 const practiceQueueClearBtn = document.getElementById("practiceQueueClear");
+const practiceRepeatsSelect = document.getElementById("practiceRepeats");
+const practicePauseBarsSelect = document.getElementById("practicePauseBars");
 
 const metronomeBpmInput = document.getElementById("metronomeBpm");
 const metronomeBeatsInput = document.getElementById("metronomeBeats");
@@ -53,6 +55,7 @@ const playbackVolumeSlider = document.getElementById("playbackVolume");
 const playbackMetronomeToggle = document.getElementById("playbackMetronomeToggle");
 
 const TEMPLATE_DRAG_KEY = "application/x-template-id";
+const QUEUE_DRAG_KEY = "application/x-practice-queue-index";
 
 let keyboardGainNode = null;
 let playbackGainNode = null;
@@ -63,6 +66,7 @@ let metronomeVolumeValue = sliderValueToGain(metronomeVolumeSlider?.value ?? 80)
 const activeKeyboardSources = new Map();
 let savedTemplates = [];
 let practiceQueue = [];
+let draggingQueueIndex = null;
 
 if (keyboardEl) {
   keyElements = createKeyboard(keyboardEl, triggerNotePlayback);
@@ -119,6 +123,18 @@ if (practiceDropZone && practiceDropZone !== practiceQueueEl) {
   practiceDropZone.addEventListener("dragover", handlePracticeQueueDragOver);
   practiceDropZone.addEventListener("dragleave", handlePracticeQueueDragLeave);
   practiceDropZone.addEventListener("drop", handlePracticeQueueDrop);
+}
+
+if (practiceRepeatsSelect) {
+  practiceRepeatsSelect.addEventListener("change", () => {
+    updateRecordingStatus(`Wiederholungen: ${practiceRepeatsSelect.value}`);
+  });
+}
+
+if (practicePauseBarsSelect) {
+  practicePauseBarsSelect.addEventListener("change", () => {
+    updateRecordingStatus(`Pause vor Wiederholung: ${practicePauseBarsSelect.value} Takte`);
+  });
 }
 
 if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput) {
@@ -449,6 +465,75 @@ function clearPracticeQueue() {
   updateRecordingStatus("Übungs-Queue geleert.");
 }
 
+function handleQueueItemDragStart(event, index) {
+  draggingQueueIndex = index;
+  const dt = event.dataTransfer;
+  if (dt) {
+    dt.effectAllowed = "move";
+    dt.setData(QUEUE_DRAG_KEY, String(index));
+    dt.setData("text/plain", String(index));
+  }
+  event.currentTarget?.classList.add("is-dragging");
+  setDropZoneHighlight(true);
+}
+
+function handleQueueItemDragEnter(event) {
+  if (!isQueueDrag(event)) return;
+  const target = event.currentTarget;
+  target?.classList.add("is-drag-over");
+}
+
+function handleQueueItemDragOver(event, index) {
+  if (!isQueueDrag(event)) return;
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+  const target = event.currentTarget;
+  target?.classList.add("is-drag-over");
+}
+
+function handleQueueItemDragLeave(event) {
+  const target = event.currentTarget;
+  target?.classList.remove("is-drag-over");
+}
+
+function handleQueueItemDrop(event, index) {
+  if (!isQueueDrag(event)) return;
+  event.preventDefault();
+  const target = event.currentTarget;
+  target?.classList.remove("is-drag-over");
+
+  const fromIndex =
+    draggingQueueIndex ?? parseInt(event.dataTransfer?.getData(QUEUE_DRAG_KEY) ?? "-1", 10);
+  if (Number.isNaN(fromIndex) || fromIndex < 0 || fromIndex >= practiceQueue.length) {
+    clearQueueDragState();
+    return;
+  }
+
+  let toIndex = index;
+  if (fromIndex < toIndex) {
+    toIndex -= 1;
+  }
+  toIndex = Math.max(0, Math.min(toIndex, practiceQueue.length - 1));
+
+  if (fromIndex === toIndex) {
+    clearQueueDragState();
+    return;
+  }
+
+  const [entry] = practiceQueue.splice(fromIndex, 1);
+  practiceQueue.splice(toIndex, 0, entry);
+  renderPracticeQueue();
+  updateRecordingStatus(`Vorlage "${entry.name}" verschoben.`);
+  clearQueueDragState();
+}
+
+function handleQueueItemDragEnd(event) {
+  event.currentTarget?.classList.remove("is-dragging");
+  clearQueueDragState();
+}
+
 function removePracticeQueueItem(index) {
   const removed = practiceQueue[index];
   practiceQueue.splice(index, 1);
@@ -458,15 +543,6 @@ function removePracticeQueueItem(index) {
   } else {
     updateRecordingStatus("Eintrag aus der Übungs-Queue entfernt.");
   }
-}
-
-function movePracticeQueueItem(index, direction) {
-  const newIndex = index + direction;
-  if (newIndex < 0 || newIndex >= practiceQueue.length) return;
-  const [entry] = practiceQueue.splice(index, 1);
-  practiceQueue.splice(newIndex, 0, entry);
-  renderPracticeQueue();
-  updateRecordingStatus(`Vorlage "${entry.name}" verschoben.`);
 }
 
 function updatePracticeQueueControls() {
@@ -480,6 +556,11 @@ function updatePracticeQueueControls() {
   if (practiceQueueClearBtn) {
     practiceQueueClearBtn.disabled = !hasItems;
   }
+}
+
+function updateRecordingNotationVisibility() {
+  if (!recordingSummaryNotation) return;
+  recordingSummaryNotation.style.display = practiceQueue.length > 0 ? "none" : "";
 }
 
 function handleTemplateDelete(templateId) {
@@ -496,18 +577,37 @@ function handleTemplateDelete(templateId) {
 
 function playPracticeQueue() {
   if (!practiceQueue.length || isRecording) return;
-  const aggregatedEvents = [];
-  let offset = 0;
+  const repeats = Math.max(1, parseInt(practiceRepeatsSelect?.value ?? "1", 10));
+  const pauseBars = Math.max(0, parseInt(practicePauseBarsSelect?.value ?? "0", 10));
+  const singleCycleEvents = [];
+  let cycleDuration = 0;
+
   practiceQueue.forEach((entry) => {
     entry.events.forEach((event) => {
-      aggregatedEvents.push({
+      singleCycleEvents.push({
         note: event.note,
-        time: offset + event.time,
+        time: cycleDuration + event.time,
         duration: event.duration ?? DEFAULT_NOTE_DURATION
       });
     });
-    offset += getTemplateDuration(entry.events) + 0.05;
+    cycleDuration += getTemplateDuration(entry.events) + 0.05;
   });
+
+  const baseBeatLength = getQueueBeatLength(singleCycleEvents);
+  const beatsPerBar = metronomeInstance?.beatsPerBar ?? 4;
+  const pauseDuration = pauseBars * baseBeatLength * beatsPerBar;
+
+  const aggregatedEvents = [];
+  for (let r = 0; r < repeats; r += 1) {
+    const repeatOffset = r * (cycleDuration + pauseDuration);
+    singleCycleEvents.forEach((event) => {
+      aggregatedEvents.push({
+        note: event.note,
+        time: repeatOffset + event.time,
+        duration: event.duration
+      });
+    });
+  }
 
   if (!aggregatedEvents.length) {
     updateRecordingStatus("Keine Noten zum Abspielen in der Übungs-Queue.");
@@ -601,13 +701,33 @@ function setDropZoneHighlight(active) {
 
 function clearDropHighlights() {
   setDropZoneHighlight(false);
-  practiceQueueEl?.classList.remove("is-drag-over");
+  if (practiceQueueEl) {
+    practiceQueueEl.classList.remove("is-drag-over");
+    practiceQueueEl.querySelectorAll(".practice-queue__item.is-drag-over").forEach((el) => {
+      el.classList.remove("is-drag-over");
+    });
+    practiceQueueEl.querySelectorAll(".practice-queue__item.is-dragging").forEach((el) => {
+      el.classList.remove("is-dragging");
+    });
+  }
 }
 
 function isTemplateDrag(event) {
+  if (isQueueDrag(event)) return false;
   const dt = event.dataTransfer;
   if (!dt) return false;
   return dt.types?.includes(TEMPLATE_DRAG_KEY);
+}
+
+function isQueueDrag(event) {
+  if (draggingQueueIndex !== null) return true;
+  const dt = event.dataTransfer;
+  return !!dt?.types?.includes(QUEUE_DRAG_KEY);
+}
+
+function clearQueueDragState() {
+  draggingQueueIndex = null;
+  clearDropHighlights();
 }
 
 function findTemplateById(id) {
@@ -1003,26 +1123,6 @@ function renderPracticeQueue() {
     const actionsEl = document.createElement("div");
     actionsEl.className = "practice-queue__actions";
 
-    if (practiceQueue.length > 1) {
-      const upBtn = document.createElement("button");
-      upBtn.type = "button";
-      upBtn.className = "practice-queue__btn";
-      upBtn.setAttribute("aria-label", `${entry.name} nach oben verschieben`);
-      upBtn.textContent = "↑";
-      upBtn.disabled = index === 0;
-      upBtn.addEventListener("click", () => movePracticeQueueItem(index, -1));
-      actionsEl.append(upBtn);
-
-      const downBtn = document.createElement("button");
-      downBtn.type = "button";
-      downBtn.className = "practice-queue__btn";
-      downBtn.setAttribute("aria-label", `${entry.name} nach unten verschieben`);
-      downBtn.textContent = "↓";
-      downBtn.disabled = index === practiceQueue.length - 1;
-      downBtn.addEventListener("click", () => movePracticeQueueItem(index, 1));
-      actionsEl.append(downBtn);
-    }
-
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "practice-queue__btn practice-queue__btn--remove";
@@ -1032,9 +1132,17 @@ function renderPracticeQueue() {
     actionsEl.append(removeBtn);
 
     item.append(nameEl, actionsEl);
+    item.draggable = true;
+    item.addEventListener("dragstart", (event) => handleQueueItemDragStart(event, index));
+    item.addEventListener("dragenter", handleQueueItemDragEnter);
+    item.addEventListener("dragover", (event) => handleQueueItemDragOver(event, index));
+    item.addEventListener("dragleave", handleQueueItemDragLeave);
+    item.addEventListener("drop", (event) => handleQueueItemDrop(event, index));
+    item.addEventListener("dragend", handleQueueItemDragEnd);
     practiceQueueEl.appendChild(item);
   });
   updatePracticeQueueControls();
+  updateRecordingNotationVisibility();
 }
 
 function handleTemplateDragStart(event, templateId) {
@@ -1045,6 +1153,7 @@ function handleTemplateDragStart(event, templateId) {
     dt.effectAllowed = "copy";
   }
   event.currentTarget?.classList.add("is-dragging");
+  setDropZoneHighlight(true);
 }
 
 function handleTemplateDragEnd(event) {
@@ -1078,6 +1187,23 @@ function handlePracticeQueueDragLeave(event) {
 }
 
 function handlePracticeQueueDrop(event) {
+  if (isQueueDrag(event)) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    if (target && target.classList) {
+      target.classList.remove("is-drag-over");
+    }
+    const fromIndex =
+      draggingQueueIndex ?? parseInt(event.dataTransfer?.getData(QUEUE_DRAG_KEY) ?? "-1", 10);
+    if (!Number.isNaN(fromIndex) && fromIndex >= 0 && fromIndex < practiceQueue.length) {
+      const [entry] = practiceQueue.splice(fromIndex, 1);
+      practiceQueue.push(entry);
+      renderPracticeQueue();
+      updateRecordingStatus(`Vorlage "${entry.name}" verschoben.`);
+    }
+    clearQueueDragState();
+    return;
+  }
   if (!isTemplateDrag(event)) return;
   event.preventDefault();
   const target = event.currentTarget;
