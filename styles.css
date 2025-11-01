@@ -122,9 +122,9 @@ body {
 
 .panel--templates {
     grid-area: templates;
-    height: 200px;
-    max-height: 200px;
+    height: max-content;
     overflow: hidden;
+    margin-bottom: 8px;
 }
 
 .panel--practice {
@@ -136,11 +136,15 @@ body {
 
 .panel--metronome {
     grid-area: metronome;
-    max-height: 140px;
-    overflow: auto;
+    height: 200px;
+    max-height: 200px;
+    overflow: hidden;
+    padding: 16px;
+    gap: 12px;
 }
 
 .panel {
+        max-height: 400px;
     background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: 24px;
@@ -148,7 +152,6 @@ body {
     padding: 8px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
     transition: border-color var(--transition), transform var(--transition);
 }
 
@@ -201,9 +204,15 @@ body {
     overflow: auto;
 }
 
+.panel--metronome {
+    height: min-content;
+}
+
 .field {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
     gap: 6px;
 }
 
@@ -336,8 +345,8 @@ select:focus-visible {
     background: var(--bg-panel-strong);
     border: 1px solid var(--border);
     border-radius: 18px;
-    padding: 18px;
-    display: flex;
+    padding: 8px;
+    display: row;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
@@ -391,7 +400,7 @@ select:focus-visible {
     font-size: 1.05rem;
 }
 
-.recording-summary p {
+.recording-notation {
     margin: 0;
     color: var(--text-muted);
     font-size: 0.95rem;
@@ -428,21 +437,88 @@ textarea:focus-visible {
     margin-top: 40px;
 }
 
-.metronome-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 16px;
-}
-
-.metronome-actions {
+.panel-header--metronome {
     display: flex;
-    justify-content: flex-start;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-direction: row;
 }
 
-.metronome-actions .btn.is-running {
+.panel-header--metronome .panel-header__info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.panel-header--metronome .btn {
+    flex-shrink: 0;
+}
+
+.panel-header--metronome .btn.is-running {
     background: rgba(248, 113, 113, 0.15);
     border-color: rgba(248, 113, 113, 0.8);
     color: var(--danger);
+}
+
+.metronome-content {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+}
+
+.metronome-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    gap: 12px;
+    width: 100%;
+}
+
+.metronome-fields .field {
+    gap: 4px;
+}
+
+.keyboard-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.keyboard-header__info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.keyboard-header__info h2 {
+    margin: 0;
+}
+
+.volume-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-control input[type="range"] {
+    width: 110px;
+}
+
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: row;
+}
+
+.toggle-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .keyboard-content {
@@ -557,6 +633,7 @@ textarea:focus-visible {
     gap: 12px;
     flex-wrap: wrap;
     align-items: center;
+    margin-bottom: 16px;
 }
 
 .recording-secondary input {

@@ -1,28 +1,11 @@
-const KEYBOARD_LAYOUT = [
-  { white: "C3", label: "C3", black: { note: "C#3", label: "C#3" } },
-  { white: "D3", label: "D3", black: { note: "D#3", label: "D#3" } },
-  { white: "E3", label: "E3" },
-  { white: "F3", label: "F3", black: { note: "F#3", label: "F#3" } },
-  { white: "G3", label: "G3", black: { note: "G#3", label: "G#3" } },
-  { white: "A3", label: "A3", black: { note: "A#3", label: "A#3" } },
-  { white: "B3", label: "B3" },
-  { white: "C4", label: "C4", black: { note: "C#4", label: "C#4" } },
-  { white: "D4", label: "D4", black: { note: "D#4", label: "D#4" } },
-  { white: "E4", label: "E4" },
-  { white: "F4", label: "F4", black: { note: "F#4", label: "F#4" } },
-  { white: "G4", label: "G4", black: { note: "G#4", label: "G#4" } },
-  { white: "A4", label: "A4", black: { note: "A#4", label: "A#4" } },
-  { white: "B4", label: "B4" },
-  { white: "C5", label: "C5" }
-];
+import { DEFAULT_NOTE_DURATION, RecordingPhase, BEAT_EPSILON } from "./constants.js";
+import { createKeyboard } from "./keyboard.js";
+import { SimpleMetronome } from "./metronome.js";
+import { playPianoNote } from "./audio.js";
 
-const DEFAULT_NOTE_DURATION = 0.6;
-const LOOKAHEAD_MS = 25;
-const SCHEDULE_AHEAD = 0.1;
-
-const keyElements = new Map();
 const keyTimers = new Map();
 const recordedEvents = [];
+let keyElements = null;
 let playbackTimeouts = [];
 let audioCtx = null;
 let isRecording = false;
@@ -30,6 +13,19 @@ let isPlayingBack = false;
 let recordStartTime = 0;
 let metronomeInstance = null;
 let lastTemplateName = "";
+
+let recordingTimingSnapshot = null;
+let lastRecordingTiming = null;
+let recordedBeatTimeline = [];
+let lastRecordingBeatTimeline = [];
+let metronomeBeatListenerCleanup = null;
+
+let recordingPhase = RecordingPhase.idle;
+let countInBeatsRemaining = 0;
+let stopPending = false;
+let stopTargetBeat = null;
+let countInHasStarted = false;
+let metronomeStartedByRecorder = false;
 
 const keyboardEl = document.getElementById("trainerKeyboard");
 const recordBtn = document.getElementById("recordBtn");
@@ -41,22 +37,33 @@ const recordingStatusEl = document.getElementById("recordingStatus");
 const templateNameInput = document.getElementById("templateName");
 const practiceTextarea = document.getElementById("practice-notes");
 const practicePlayBtn = document.getElementById("practicePlay");
-const recordingSummaryText = document.getElementById("recordingSummaryText");
+const recordingSummaryNotation = document.getElementById("recordingSummaryNotation");
 
 const metronomeBpmInput = document.getElementById("metronomeBpm");
 const metronomeBeatsInput = document.getElementById("metronomeBeats");
-const metronomeSoundSelect = document.getElementById("metronomeSound");
 const metronomeToggleBtn = document.getElementById("metronomeToggle");
+const metronomeVolumeSlider = document.getElementById("metronomeVolume");
+const keyboardVolumeSlider = document.getElementById("keyboardVolume");
+const playbackVolumeSlider = document.getElementById("playbackVolume");
+const playbackMetronomeToggle = document.getElementById("playbackMetronomeToggle");
+
+let keyboardGainNode = null;
+let playbackGainNode = null;
+let metronomeStartedForPlayback = false;
+let keyboardVolumeValue = sliderValueToGain(keyboardVolumeSlider?.value ?? 90);
+let playbackVolumeValue = sliderValueToGain(playbackVolumeSlider?.value ?? 80);
+let metronomeVolumeValue = sliderValueToGain(metronomeVolumeSlider?.value ?? 80);
+const activeKeyboardSources = new Map();
 
 if (keyboardEl) {
-  createKeyboard(keyboardEl);
+  keyElements = createKeyboard(keyboardEl, triggerNotePlayback);
 }
 
 if (recordBtn && stopBtn && playBtn && deleteBtn && saveBtn) {
   recordBtn.addEventListener("click", startRecording);
   stopBtn.addEventListener("click", stopRecording);
   playBtn.addEventListener("click", () => playRecording());
-  deleteBtn.addEventListener("click", clearRecording);
+  deleteBtn.addEventListener("click", () => clearRecording());
   saveBtn.addEventListener("click", saveRecordingAsTemplate);
 }
 
@@ -64,76 +71,83 @@ if (practicePlayBtn) {
   practicePlayBtn.addEventListener("click", () => playRecording());
 }
 
-if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput && metronomeSoundSelect) {
+if (keyboardVolumeSlider) {
+  keyboardVolumeSlider.addEventListener("input", () => {
+    keyboardVolumeValue = sliderValueToGain(keyboardVolumeSlider.value);
+    updateKeyboardVolume();
+  });
+}
+
+if (playbackVolumeSlider) {
+  playbackVolumeSlider.addEventListener("input", () => {
+    playbackVolumeValue = sliderValueToGain(playbackVolumeSlider.value);
+    updatePlaybackVolume();
+  });
+}
+
+if (metronomeVolumeSlider) {
+  metronomeVolumeSlider.addEventListener("input", () => {
+    metronomeVolumeValue = sliderValueToGain(metronomeVolumeSlider.value);
+    if (metronomeInstance) {
+      metronomeInstance.setVolume(metronomeVolumeValue);
+    }
+  });
+}
+
+if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput) {
   metronomeInstance = new SimpleMetronome({
     getContext: getAudioContext,
     bpmInput: metronomeBpmInput,
     beatsInput: metronomeBeatsInput,
-    soundSelect: metronomeSoundSelect,
     toggleButton: metronomeToggleBtn
   });
 
   metronomeToggleBtn.addEventListener("click", () => metronomeInstance.toggle());
-  metronomeSoundSelect.addEventListener("change", () => metronomeInstance.setSound(metronomeSoundSelect.value));
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       metronomeInstance?.stop();
     }
   });
+
+  metronomeInstance.setVolume(metronomeVolumeValue);
 }
 
-function createKeyboard(container) {
-  KEYBOARD_LAYOUT.forEach(({ white, label, black }) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "key-wrapper";
-
-    const whiteKey = createKeyElement(white, label, "white");
-    wrapper.append(whiteKey);
-
-    if (black) {
-      const blackKey = createKeyElement(black.note, black.label ?? black.note, "black");
-      wrapper.append(blackKey);
-    }
-
-    container.append(wrapper);
-  });
+function renderRecordingSummaryNotation(content) {
+  if (!recordingSummaryNotation) return;
+  if (typeof content === "string") {
+    recordingSummaryNotation.textContent = content;
+    return;
+  }
+  recordingSummaryNotation.textContent = "";
 }
 
-function createKeyElement(note, label, variant) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = `key ${variant}`;
-  btn.dataset.note = note;
-  btn.setAttribute("aria-label", `Note ${label}`);
-
-  const span = document.createElement("span");
-  span.className = "key-label";
-  span.textContent = label;
-  btn.append(span);
-
-  const pressHandler = (event) => {
-    event.preventDefault();
-    triggerNotePlayback(note);
-  };
-
-  btn.addEventListener("pointerdown", pressHandler);
-  btn.addEventListener("keydown", (event) => {
-    if (event.code === "Space" || event.code === "Enter") {
-      event.preventDefault();
-      triggerNotePlayback(note);
-    }
-  });
-
-  keyElements.set(note, btn);
-  return btn;
-}
+renderRecordingSummaryNotation("Noch keine Aufnahme.");
 
 async function triggerNotePlayback(note) {
   const ctx = await getAudioContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
-  playTone(ctx, note, now, DEFAULT_NOTE_DURATION);
+  try {
+    stopActiveKeyboardNote(note, now);
+
+    const voice = await playPianoNote(ctx, note, now, {
+      destination: keyboardGainNode ?? ctx.destination
+    });
+    if (voice && voice.source) {
+      activeKeyboardSources.set(note, voice);
+      const cleanup = () => {
+        activeKeyboardSources.delete(note);
+        voice.source.removeEventListener?.("ended", cleanup);
+        voice.source.onended = null;
+      };
+      voice.source.addEventListener?.("ended", cleanup);
+      voice.source.onended = cleanup;
+    }
+  } catch (error) {
+    console.error("Konnte Pianoton nicht wiedergeben:", error);
+    updateRecordingStatus("Audio konnte nicht abgespielt werden.");
+  }
   flashKey(note, "active", DEFAULT_NOTE_DURATION * 600);
 
   if (isRecording) {
@@ -151,43 +165,248 @@ async function triggerNotePlayback(note) {
 
 async function startRecording() {
   const ctx = await getAudioContext();
-  if (!ctx || isRecording) return;
+  if (!ctx || isRecording || recordingPhase !== RecordingPhase.idle) {
+    return;
+  }
+
+  if (!metronomeInstance) {
+    updateRecordingStatus("Metronom ist nicht verfuegbar.");
+    return;
+  }
 
   stopPlayback();
+
+  if (metronomeBeatListenerCleanup) {
+    metronomeBeatListenerCleanup();
+    metronomeBeatListenerCleanup = null;
+  }
+
+  if (!metronomeInstance.isActive()) {
+    await metronomeInstance.start();
+    metronomeStartedByRecorder = metronomeInstance.isActive();
+  } else {
+    metronomeStartedByRecorder = false;
+  }
+
+  if (!metronomeInstance.isActive()) {
+    updateRecordingStatus("Metronom konnte nicht gestartet werden.");
+    return;
+  }
+
+  recordingTimingSnapshot = null;
+  recordedBeatTimeline = [];
   recordedEvents.length = 0;
-  recordStartTime = ctx.currentTime;
-  isRecording = true;
+  recordStartTime = 0;
+  stopPending = false;
+  stopTargetBeat = null;
+  countInBeatsRemaining = Math.max(1, metronomeInstance.beatsPerBar);
+  countInHasStarted = false;
+  recordingPhase = RecordingPhase.countIn;
+
+  metronomeBeatListenerCleanup = metronomeInstance.addBeatListener(handleRecordingBeat);
 
   recordBtn.disabled = true;
   stopBtn.disabled = false;
   playBtn.disabled = true;
   deleteBtn.disabled = true;
   saveBtn.disabled = true;
-  practicePlayBtn.disabled = true;
+  if (practicePlayBtn) {
+    practicePlayBtn.disabled = true;
+  }
 
+  updateRecordingStatus("Einzaehler vorbereitet - warte auf Taktbeginn ...");
+  renderRecordingSummaryNotation("Einzaehler laeuft ...");
+}
+
+function handleRecordingBeat(beat) {
+  if (recordingPhase === RecordingPhase.countIn) {
+    const total = Math.max(1, metronomeInstance?.beatsPerBar ?? 1);
+    if (!countInHasStarted) {
+      if (!beat.accent) {
+        updateRecordingStatus("Warte auf Taktbeginn ...");
+        return;
+      }
+      countInHasStarted = true;
+      countInBeatsRemaining = Math.max(0, total - 1);
+      const completedFirst = total - countInBeatsRemaining;
+      updateRecordingStatus(`Einzaehler ${completedFirst}/${total}`);
+      if (countInBeatsRemaining <= 0) {
+        recordingPhase = RecordingPhase.awaitingStart;
+      }
+      return;
+    }
+
+    countInBeatsRemaining = Math.max(0, countInBeatsRemaining - 1);
+    const completed = total - countInBeatsRemaining;
+    updateRecordingStatus(`Einzaehler ${completed}/${total}`);
+    if (countInBeatsRemaining <= 0) {
+      recordingPhase = RecordingPhase.awaitingStart;
+    }
+    return;
+  }
+
+  if (recordingPhase === RecordingPhase.awaitingStart) {
+    beginActiveRecording(beat);
+    return;
+  }
+
+  if (recordingPhase === RecordingPhase.recording) {
+    recordedBeatTimeline.push(beat);
+    if (stopPending && stopTargetBeat != null && beat.totalBeats + BEAT_EPSILON >= stopTargetBeat) {
+      finalizeRecordingNow();
+    }
+  }
+}
+
+function beginActiveRecording(beat) {
+  recordingPhase = RecordingPhase.recording;
+  isRecording = true;
+  countInHasStarted = false;
+  recordStartTime = beat.time;
+  recordingTimingSnapshot = metronomeInstance?.getTimingState(beat.time) ?? metronomeInstance?.getTimingState();
+  recordedBeatTimeline = [beat];
   updateRecordingStatus("Aufnahme laeuft - spiele dein Pattern ein.");
-  updateRecordingSummaryPlaceholder("Aufnahme laeuft ...");
+  renderRecordingSummaryNotation("Aufnahme laeuft ...");
 }
 
 function stopRecording() {
-  if (!isRecording) return;
+  if (recordingPhase === RecordingPhase.idle) {
+    return;
+  }
+
+  if (recordingPhase === RecordingPhase.countIn || recordingPhase === RecordingPhase.awaitingStart) {
+    cleanupMetronomeListener();
+    recordingPhase = RecordingPhase.idle;
+    isRecording = false;
+    countInBeatsRemaining = 0;
+    countInHasStarted = false;
+    stopPending = false;
+    stopTargetBeat = null;
+    recordStartTime = 0;
+    recordingTimingSnapshot = null;
+    recordedBeatTimeline = [];
+
+    stopMetronomeIfNeeded();
+
+    recordBtn.disabled = false;
+    stopBtn.disabled = true;
+    playBtn.disabled = recordedEvents.length === 0;
+    deleteBtn.disabled = recordedEvents.length === 0;
+    saveBtn.disabled = recordedEvents.length === 0;
+    if (practicePlayBtn) {
+      practicePlayBtn.disabled = recordedEvents.length === 0;
+    }
+    renderRecordingSummaryNotation(recordedEvents.length ? formatRecordingSummary(recordedEvents) : "Noch keine Aufnahme.");
+    updateRecordingStatus("Aufnahme abgebrochen.");
+    return;
+  }
+
+  if (recordingPhase === RecordingPhase.recording) {
+    if (stopPending) {
+      return;
+    }
+
+    const timing = metronomeInstance?.getTimingState();
+    if (!timing) {
+      finalizeRecordingNow();
+      return;
+    }
+
+    const beatsPerBar = Math.max(1, timing.beatsPerBar || 1);
+    const totalBeats = timing.totalBeats ?? 0;
+    const currentBar = Math.floor(totalBeats / beatsPerBar);
+    const beatPosition = totalBeats - currentBar * beatsPerBar;
+    let targetBar = currentBar;
+    if (Math.abs(beatPosition) > BEAT_EPSILON) {
+      targetBar = currentBar + 1;
+    }
+    stopTargetBeat = targetBar * beatsPerBar;
+    stopPending = true;
+    stopBtn.disabled = true;
+    updateRecordingStatus("Stop angefordert - schliesse aktuellen Takt ab ...");
+
+    if (stopTargetBeat <= totalBeats + BEAT_EPSILON) {
+      finalizeRecordingNow();
+    }
+  }
+}
+
+function finalizeRecordingNow() {
+  if (recordingPhase === RecordingPhase.idle && !isRecording) {
+    return;
+  }
+
   isRecording = false;
+  recordingPhase = RecordingPhase.idle;
+  stopPending = false;
+  countInBeatsRemaining = 0;
+  countInHasStarted = false;
+  stopTargetBeat = null;
   stopBtn.disabled = true;
   recordBtn.disabled = false;
 
+  cleanupMetronomeListener();
+
+  if (!recordingTimingSnapshot) {
+    recordingTimingSnapshot = metronomeInstance?.getTimingState();
+  }
+
   if (recordedEvents.length === 0) {
     updateRecordingStatus("Keine Noten aufgenommen. Versuche es noch einmal.");
-    clearRecording(false);
+    renderRecordingSummaryNotation("Noch keine Aufnahme.");
+    playBtn.disabled = true;
+    deleteBtn.disabled = true;
+    saveBtn.disabled = true;
+    if (practicePlayBtn) {
+      practicePlayBtn.disabled = true;
+    }
+    if (practiceTextarea) {
+      practiceTextarea.value = "";
+    }
+    if (templateNameInput) {
+      templateNameInput.value = "";
+    }
+    lastTemplateName = "";
+    stopMetronomeIfNeeded();
     return;
   }
 
   playBtn.disabled = false;
   deleteBtn.disabled = false;
   saveBtn.disabled = false;
-  practicePlayBtn.disabled = false;
+  if (practicePlayBtn) {
+    practicePlayBtn.disabled = false;
+  }
+
+  lastRecordingTiming = recordingTimingSnapshot;
+  lastRecordingBeatTimeline = recordedBeatTimeline.slice();
+  recordingTimingSnapshot = null;
+  recordedBeatTimeline = [];
 
   updateRecordingStatus("Aufnahme beendet. Du kannst nun anhoeren, speichern oder loeschen.");
   updatePracticeArea(lastTemplateName || "Letzte Aufnahme");
+  stopMetronomeIfNeeded();
+}
+
+function cleanupMetronomeListener() {
+  if (metronomeBeatListenerCleanup) {
+    metronomeBeatListenerCleanup();
+    metronomeBeatListenerCleanup = null;
+  }
+}
+
+function stopMetronomeIfNeeded() {
+  if (metronomeStartedByRecorder && metronomeInstance?.isActive()) {
+    metronomeInstance.stop();
+  }
+  metronomeStartedByRecorder = false;
+}
+
+function stopMetronomeAfterPlayback() {
+  if (metronomeStartedForPlayback && metronomeInstance?.isActive()) {
+    metronomeInstance.stop();
+  }
+  metronomeStartedForPlayback = false;
 }
 
 function clearRecording(showStatus = true) {
@@ -197,19 +416,39 @@ function clearRecording(showStatus = true) {
   recordStartTime = 0;
   lastTemplateName = "";
 
+  cleanupMetronomeListener();
+
+  recordingPhase = RecordingPhase.idle;
+  countInBeatsRemaining = 0;
+  countInHasStarted = false;
+  stopPending = false;
+  stopTargetBeat = null;
+
+  recordingTimingSnapshot = null;
+  lastRecordingTiming = null;
+  recordedBeatTimeline = [];
+  lastRecordingBeatTimeline = [];
+
   recordBtn.disabled = false;
   stopBtn.disabled = true;
   playBtn.disabled = true;
   deleteBtn.disabled = true;
   saveBtn.disabled = true;
-  practicePlayBtn.disabled = true;
+    if (practicePlayBtn) {
+      practicePlayBtn.disabled = true;
+    }
 
-  updateRecordingSummaryPlaceholder("Noch keine Aufnahme.");
+  renderRecordingSummaryNotation("Noch keine Aufnahme.");
   if (showStatus) {
     updateRecordingStatus("Aufnahme geloescht.");
   }
-  practiceTextarea.value = "";
-  templateNameInput.value = "";
+  if (practiceTextarea) {
+    practiceTextarea.value = "";
+  }
+  if (templateNameInput) {
+    templateNameInput.value = "";
+  }
+  stopMetronomeIfNeeded();
 }
 
 async function playRecording() {
@@ -222,16 +461,42 @@ async function playRecording() {
   isPlayingBack = true;
   recordBtn.disabled = true;
   playBtn.disabled = true;
-  practicePlayBtn.disabled = true;
+  if (practicePlayBtn) {
+    practicePlayBtn.disabled = true;
+  }
+
+  const shouldSyncWithMetronome = playbackMetronomeToggle ? playbackMetronomeToggle.checked : false;
+  let tempoScale = 1;
+
+  const recordedBeatLength =
+    lastRecordingTiming && Number.isFinite(lastRecordingTiming.beatLengthSeconds) && lastRecordingTiming.beatLengthSeconds > 0
+      ? lastRecordingTiming.beatLengthSeconds
+      : null;
+
+  if (shouldSyncWithMetronome && metronomeInstance) {
+    const currentBeatLength = 60 / metronomeInstance.bpm;
+    if (recordedBeatLength) {
+      tempoScale = currentBeatLength / recordedBeatLength;
+    }
+    if (!metronomeInstance.isActive()) {
+      await metronomeInstance.start();
+      metronomeStartedForPlayback = metronomeInstance.isActive();
+    } else {
+      metronomeStartedForPlayback = false;
+    }
+  } else {
+    metronomeStartedForPlayback = false;
+  }
 
   const startAt = ctx.currentTime + 0.08;
-  const totalDuration =
-    recordedEvents[recordedEvents.length - 1].time +
-    recordedEvents[recordedEvents.length - 1].duration +
-    0.25;
+  const lastEvent = recordedEvents[recordedEvents.length - 1];
+  const totalDuration = lastEvent.time * tempoScale + lastEvent.duration * tempoScale + 0.25;
 
-  recordedEvents.forEach((event) => {
-    scheduleTone(ctx, event.note, startAt + event.time, event.duration);
+  recordedEvents.forEach((event, index) => {
+    const eventStart = startAt + event.time * tempoScale;
+    const nextEvent = recordedEvents[index + 1];
+    const eventDuration = nextEvent ? Math.max((nextEvent.time - event.time) * tempoScale, 0.06) : undefined;
+    scheduleTone(ctx, event.note, eventStart, eventDuration, playbackGainNode ?? ctx.destination);
   });
 
   playbackTimeouts.push(
@@ -241,7 +506,7 @@ async function playRecording() {
     }, totalDuration * 1000)
   );
 
-  updateRecordingStatus("Spiele Aufnahme ab ...");
+  updateRecordingStatus(shouldSyncWithMetronome ? "Spiele Aufnahme (Metronomtempo) ab ..." : "Spiele Aufnahme ab ...");
 }
 
 function stopPlayback() {
@@ -255,9 +520,12 @@ function stopPlayback() {
   isPlayingBack = false;
   if (recordedEvents.length > 0) {
     playBtn.disabled = false;
-    practicePlayBtn.disabled = false;
+    if (practicePlayBtn) {
+      practicePlayBtn.disabled = false;
+    }
   }
   recordBtn.disabled = false;
+  stopMetronomeAfterPlayback();
 }
 
 function saveRecordingAsTemplate() {
@@ -265,7 +533,11 @@ function saveRecordingAsTemplate() {
     updateRecordingStatus("Keine Aufnahme vorhanden. Bitte zuerst aufnehmen.");
     return;
   }
-  const name = templateNameInput.value.trim() || "Unbenannte Vorlage";
+  const rawName = templateNameInput ? templateNameInput.value.trim() : "";
+  const name = rawName || "Unbenannte Vorlage";
+  if (templateNameInput && !rawName) {
+    templateNameInput.value = name;
+  }
   lastTemplateName = name;
   updatePracticeArea(name);
   updateRecordingStatus(`Vorlage "${name}" gespeichert. Du findest sie in "Meine Uebung".`);
@@ -273,13 +545,13 @@ function saveRecordingAsTemplate() {
 
 function updatePracticeArea(name) {
   const summary = formatRecordingSummary(recordedEvents);
-  recordingSummaryText.textContent = summary;
-  practiceTextarea.value = `${name}: ${summary}`;
-  practicePlayBtn.disabled = recordedEvents.length === 0;
-}
-
-function updateRecordingSummaryPlaceholder(text) {
-  recordingSummaryText.textContent = text;
+  renderRecordingSummaryNotation(summary);
+  if (practiceTextarea) {
+    practiceTextarea.value = `${name}: ${summary}`;
+  }
+  if (practicePlayBtn) {
+    practicePlayBtn.disabled = recordedEvents.length === 0;
+  }
 }
 
 function updateRecordingStatus(text) {
@@ -306,30 +578,65 @@ async function getAudioContext() {
   if (audioCtx.state === "suspended") {
     await audioCtx.resume();
   }
+  ensureAudioGraph(audioCtx);
   return audioCtx;
 }
 
-function playTone(ctx, note, when, duration) {
-  const frequency = noteToFrequency(note);
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(frequency, when);
-
-  gain.gain.setValueAtTime(0, when);
-  gain.gain.linearRampToValueAtTime(0.32, when + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
-
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(when);
-  osc.stop(when + duration + 0.05);
+function ensureAudioGraph(ctx) {
+  if (!ctx) return;
+  if (!keyboardGainNode) {
+    keyboardGainNode = ctx.createGain();
+    keyboardGainNode.connect(ctx.destination);
+  }
+  if (!playbackGainNode) {
+    playbackGainNode = ctx.createGain();
+    playbackGainNode.connect(ctx.destination);
+  }
+  updateKeyboardVolume(ctx);
+  updatePlaybackVolume(ctx);
 }
 
-function scheduleTone(ctx, note, when, duration) {
-  playTone(ctx, note, when, duration);
+function updateKeyboardVolume(ctx = audioCtx) {
+  if (keyboardGainNode && ctx) {
+    keyboardGainNode.gain.setTargetAtTime(keyboardVolumeValue, ctx.currentTime, 0.01);
+  }
+}
+
+function updatePlaybackVolume(ctx = audioCtx) {
+  if (playbackGainNode && ctx) {
+    playbackGainNode.gain.setTargetAtTime(playbackVolumeValue, ctx.currentTime, 0.01);
+  }
+}
+
+function sliderValueToGain(value) {
+  const numeric = Math.max(0, Math.min(100, Number(value)));
+  const normalized = numeric / 100;
+  return normalized * normalized;
+}
+
+function stopActiveKeyboardNote(note, time = audioCtx?.currentTime ?? 0) {
+  if (!activeKeyboardSources.size) return;
+  const stopTime = Math.max(time, audioCtx?.currentTime ?? time);
+  activeKeyboardSources.forEach((voice, key) => {
+    if (!voice) return;
+    try {
+      voice.stop(stopTime);
+    } catch (error) {
+      console.warn("Konnte aktiven Ton nicht stoppen:", error);
+    }
+    activeKeyboardSources.delete(key);
+  });
+}
+
+function scheduleTone(ctx, note, when, duration, destination) {
+  playPianoNote(ctx, note, when, {
+    duration,
+    destination: destination ?? ctx.destination
+  }).catch((error) => {
+    console.error("Konnte Pianoton nicht planen:", error);
+  });
   const delay = Math.max(0, (when - ctx.currentTime) * 1000);
-  const highlightDuration = duration * 1000;
+  const highlightDuration = Math.max(50, (duration ?? DEFAULT_NOTE_DURATION) * 1000);
   const timeoutId = window.setTimeout(() => {
     flashKey(note, "playback-active", highlightDuration);
   }, delay);
@@ -337,6 +644,7 @@ function scheduleTone(ctx, note, when, duration) {
 }
 
 function flashKey(note, className, durationMs) {
+  if (!keyElements) return;
   const el = keyElements.get(note);
   if (!el) return;
 
@@ -358,130 +666,7 @@ function clearPlaybackVisuals() {
       window.clearTimeout(timers["playback-active"]);
       timers["playback-active"] = null;
     }
-    const el = keyElements.get(note);
+    const el = keyElements?.get(note);
     el?.classList.remove("playback-active");
   });
-}
-
-function noteToFrequency(note) {
-  const match = /^([A-G])(#?)(\d)$/.exec(note);
-  if (!match) return 440;
-  const [, letter, sharp, octaveStr] = match;
-  const SEMITONES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-  const octave = parseInt(octaveStr, 10);
-  const base = SEMITONES[letter];
-  const midi = (octave + 1) * 12 + base + (sharp ? 1 : 0);
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-class SimpleMetronome {
-  constructor({ getContext, bpmInput, beatsInput, soundSelect, toggleButton }) {
-    this.getContext = getContext;
-    this.bpmInput = bpmInput;
-    this.beatsInput = beatsInput;
-    this.soundSelect = soundSelect;
-    this.toggleButton = toggleButton;
-
-    this.ctx = null;
-    this.metroGain = null;
-    this.nextNoteTime = 0;
-    this.currentBeat = 0;
-    this.isRunning = false;
-    this.timerId = null;
-    this.soundMode = "click";
-  }
-
-  setSound(mode) {
-    this.soundMode = mode === "kick" ? "kick" : "click";
-  }
-
-  async start() {
-    if (this.isRunning) return;
-    const ctx = await this.getContext();
-    if (!ctx) return;
-
-    this.ctx = ctx;
-    this.ensureGain();
-
-    this.currentBeat = 0;
-    this.nextNoteTime = ctx.currentTime + 0.1;
-    this.isRunning = true;
-
-    this.toggleButton.textContent = "Stop";
-    this.toggleButton.classList.add("is-running");
-    this.timerId = window.setInterval(() => this.scheduler(), LOOKAHEAD_MS);
-  }
-
-  stop() {
-    if (!this.isRunning) return;
-    this.isRunning = false;
-    this.toggleButton.textContent = "Start";
-    this.toggleButton.classList.remove("is-running");
-    if (this.timerId) {
-      window.clearInterval(this.timerId);
-      this.timerId = null;
-    }
-  }
-
-  toggle() {
-    if (this.isRunning) {
-      this.stop();
-    } else {
-      this.start();
-    }
-  }
-
-  scheduler() {
-    if (!this.ctx) return;
-    while (this.nextNoteTime < this.ctx.currentTime + SCHEDULE_AHEAD) {
-      const accent = this.currentBeat === 0;
-      this.scheduleTick(accent, this.nextNoteTime);
-      this.nextNoteTime += 60 / this.bpm;
-      this.currentBeat = (this.currentBeat + 1) % this.beatsPerBar;
-    }
-  }
-
-  scheduleTick(accent, when) {
-    if (!this.ctx || !this.metroGain) return;
-    if (this.soundMode === "kick") {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(accent ? 120 : 80, when);
-      gain.gain.setValueAtTime(accent ? 0.55 : 0.38, when);
-      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.08);
-      osc.connect(gain).connect(this.metroGain);
-      osc.start(when);
-      osc.stop(when + 0.12);
-    } else {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = "square";
-      osc.frequency.setValueAtTime(accent ? 2000 : 1400, when);
-      gain.gain.setValueAtTime(accent ? 0.18 : 0.12, when);
-      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
-      osc.connect(gain).connect(this.metroGain);
-      osc.start(when);
-      osc.stop(when + 0.08);
-    }
-  }
-
-  ensureGain() {
-    if (!this.ctx || this.metroGain) return;
-    this.metroGain = this.ctx.createGain();
-    this.metroGain.gain.value = 0.9;
-    this.metroGain.connect(this.ctx.destination);
-  }
-
-  get bpm() {
-    return clamp(parseInt(this.bpmInput.value, 10) || 96, 30, 220);
-  }
-
-  get beatsPerBar() {
-    return clamp(parseInt(this.beatsInput.value, 10) || 4, 1, 12);
-  }
 }

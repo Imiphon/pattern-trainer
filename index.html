@@ -40,7 +40,16 @@
                 <article class="panel panel--practice" aria-labelledby="panel-practice">
                     <header class="panel-header">
                         <h2 id="panel-practice">Meine Uebung</h2>
-                        <p class="panel-subtitle">Notiere deine Notation oder Beobachtungen.</p>
+                        <div class="playback-controls">
+                            <label class="volume-control">
+                                <span class="field-label">Playback Vol.</span>
+                                <input id="playbackVolume" type="range" min="0" max="100" value="80" />
+                            </label>
+                            <label class="toggle-control">
+                                <span class="field-label">Metronom</span>
+                                <input id="playbackMetronomeToggle" type="checkbox" checked />
+                            </label>
+                        </div>
                     </header>
                     <div class="panel-content">
                         <section class="recording-summary" aria-live="polite">
@@ -48,7 +57,7 @@
                                 <h3>Letzte Aufnahme</h3>
                                 <button id="practicePlay" class="btn ghost small" type="button" disabled>Abspielen</button>
                             </div>
-                            <p id="recordingSummaryText">Noch keine Aufnahme.</p>
+                            <div id="recordingSummaryNotation" class="recording-notation">Noch keine Aufnahme.</div>
                         </section>
                         
                         <div class="cta-row">
@@ -61,7 +70,6 @@
                     <article class="panel panel--templates" aria-labelledby="panel-templates">
                     <header class="panel-header">
                         <h2 id="panel-templates">Vorlagen</h2>
-                        <p class="panel-subtitle">Waehle eine Struktur als Ausgangspunkt.</p>
                     </header>
                     <div class="panel-content">
                         <div class="template-grid">
@@ -86,11 +94,17 @@
                 </article>
 
                 <article class="panel panel--metronome" aria-labelledby="panel-metronome">
-                    <header class="panel-header">
-                        <h2 id="panel-metronome">Metronom</h2>
-                        <p class="panel-subtitle">Halte dein Tempo waehrend der Aufnahme stabil.</p>
+                    <header class="panel-header panel-header--metronome">
+                        <div class="panel-header__info">
+                            <h2 id="panel-metronome">Metronom</h2>
+                            <label class="volume-control">
+                                <span class="field-label">Vol.</span>
+                                <input id="metronomeVolume" type="range" min="0" max="100" value="80" />
+                            </label>
+                        </div>
+                        <button id="metronomeToggle" class="btn ghost" type="button">Start</button>
                     </header>
-                    <div class="panel-content">
+                    <div class="panel-content metronome-content">
                         <div class="metronome-fields">
                             <label class="field">
                                 <span class="field-label">BPM</span>
@@ -100,19 +114,8 @@
                                 <span class="field-label">Beats/Takt</span>
                                 <input id="metronomeBeats" type="number" min="1" max="12" value="4" />
                             </label>
-                            <label class="field">
-                                <span class="field-label">Sound</span>
-                                <select id="metronomeSound">
-                                    <option value="click" selected>Click</option>
-                                    <option value="kick">Kick</option>
-                                </select>
-                            </label>
-                        </div>
-                        <div class="metronome-actions">
-                            <button id="metronomeToggle" class="btn ghost" type="button">Start</button>
                         </div>
                     </div>
-                </article>
                 </article>
             </section>
 
@@ -120,9 +123,14 @@
 
             <section class="keyboard-area" aria-label="Keyboardaufnahme">
                 <article class="panel keyboard-panel" aria-labelledby="panel-keyboard">
-                    <header class="panel-header">
-                        <h2 id="panel-keyboard">Keyboard &amp; Aufnahme</h2>
-                        
+                    <header class="panel-header keyboard-header">
+                        <div class="keyboard-header__info">
+                            <h2 id="panel-keyboard">Keyboard &amp; Aufnahme</h2>
+                            <label class="volume-control">
+                                <span class="field-label">Vol.</span>
+                                <input id="keyboardVolume" type="range" min="0" max="100" value="90" />
+                            </label>
+                        </div>
                     </header>
                         <div class="recording-controls">
                             <div class="recording-primary">
@@ -137,6 +145,7 @@
                             </div>
                         </div>
                     <div class="panel-content keyboard-content">
+                        
                         <div id="trainerKeyboard" class="keyboard" role="application"
                             aria-label="Klaviertastatur (C3-B4)"></div>
                         <p id="recordingStatus" class="recording-status">Bereit fuer Aufnahme.</p>
