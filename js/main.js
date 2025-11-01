@@ -1,4 +1,4 @@
-import { DEFAULT_NOTE_DURATION, RecordingPhase, BEAT_EPSILON } from "./constants.js";
+import { DEFAULT_NOTE_DURATION, RecordingPhase, BEAT_EPSILON, DEFAULT_TEMPLATES } from "./constants.js";
 import { createKeyboard } from "./keyboard.js";
 import { SimpleMetronome } from "./metronome.js";
 import { playPianoNote } from "./audio.js";
@@ -36,8 +36,13 @@ const saveBtn = document.getElementById("saveBtn");
 const recordingStatusEl = document.getElementById("recordingStatus");
 const templateNameInput = document.getElementById("templateName");
 const practiceTextarea = document.getElementById("practice-notes");
-const practicePlayBtn = document.getElementById("practicePlay");
 const recordingSummaryNotation = document.getElementById("recordingSummaryNotation");
+const templateGrid = document.getElementById("templateGrid");
+const practiceDropZone = document.getElementById("practiceDropZone");
+const practiceHint = document.getElementById("practiceHint");
+const practiceQueueEl = document.getElementById("practiceQueue");
+const practiceQueuePlayBtn = document.getElementById("practiceQueuePlay");
+const practiceQueueClearBtn = document.getElementById("practiceQueueClear");
 
 const metronomeBpmInput = document.getElementById("metronomeBpm");
 const metronomeBeatsInput = document.getElementById("metronomeBeats");
@@ -47,6 +52,8 @@ const keyboardVolumeSlider = document.getElementById("keyboardVolume");
 const playbackVolumeSlider = document.getElementById("playbackVolume");
 const playbackMetronomeToggle = document.getElementById("playbackMetronomeToggle");
 
+const TEMPLATE_DRAG_KEY = "application/x-template-id";
+
 let keyboardGainNode = null;
 let playbackGainNode = null;
 let metronomeStartedForPlayback = false;
@@ -54,10 +61,14 @@ let keyboardVolumeValue = sliderValueToGain(keyboardVolumeSlider?.value ?? 90);
 let playbackVolumeValue = sliderValueToGain(playbackVolumeSlider?.value ?? 80);
 let metronomeVolumeValue = sliderValueToGain(metronomeVolumeSlider?.value ?? 80);
 const activeKeyboardSources = new Map();
+let savedTemplates = [];
+let practiceQueue = [];
 
 if (keyboardEl) {
   keyElements = createKeyboard(keyboardEl, triggerNotePlayback);
 }
+
+initializeTemplates();
 
 if (recordBtn && stopBtn && playBtn && deleteBtn && saveBtn) {
   recordBtn.addEventListener("click", startRecording);
@@ -65,10 +76,6 @@ if (recordBtn && stopBtn && playBtn && deleteBtn && saveBtn) {
   playBtn.addEventListener("click", () => playRecording());
   deleteBtn.addEventListener("click", () => clearRecording());
   saveBtn.addEventListener("click", saveRecordingAsTemplate);
-}
-
-if (practicePlayBtn) {
-  practicePlayBtn.addEventListener("click", () => playRecording());
 }
 
 if (keyboardVolumeSlider) {
@@ -94,6 +101,26 @@ if (metronomeVolumeSlider) {
   });
 }
 
+if (practiceQueuePlayBtn) {
+  practiceQueuePlayBtn.addEventListener("click", playPracticeQueue);
+}
+
+if (practiceQueueClearBtn) {
+  practiceQueueClearBtn.addEventListener("click", clearPracticeQueue);
+}
+
+if (practiceQueueEl) {
+  practiceQueueEl.addEventListener("dragover", handlePracticeQueueDragOver);
+  practiceQueueEl.addEventListener("dragleave", handlePracticeQueueDragLeave);
+  practiceQueueEl.addEventListener("drop", handlePracticeQueueDrop);
+}
+
+if (practiceDropZone && practiceDropZone !== practiceQueueEl) {
+  practiceDropZone.addEventListener("dragover", handlePracticeQueueDragOver);
+  practiceDropZone.addEventListener("dragleave", handlePracticeQueueDragLeave);
+  practiceDropZone.addEventListener("drop", handlePracticeQueueDrop);
+}
+
 if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput) {
   metronomeInstance = new SimpleMetronome({
     getContext: getAudioContext,
@@ -110,6 +137,12 @@ if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput) {
   });
 
   metronomeInstance.setVolume(metronomeVolumeValue);
+}
+
+if (practiceQueueEl) {
+  practiceQueueEl.addEventListener("dragover", handlePracticeQueueDragOver);
+  practiceQueueEl.addEventListener("dragleave", handlePracticeQueueDragLeave);
+  practiceQueueEl.addEventListener("drop", handlePracticeQueueDrop);
 }
 
 function renderRecordingSummaryNotation(content) {
@@ -210,9 +243,7 @@ async function startRecording() {
   playBtn.disabled = true;
   deleteBtn.disabled = true;
   saveBtn.disabled = true;
-  if (practicePlayBtn) {
-    practicePlayBtn.disabled = true;
-  }
+  updatePracticeQueueControls();
 
   updateRecordingStatus("Einzaehler vorbereitet - warte auf Taktbeginn ...");
   renderRecordingSummaryNotation("Einzaehler laeuft ...");
@@ -293,9 +324,7 @@ function stopRecording() {
     playBtn.disabled = recordedEvents.length === 0;
     deleteBtn.disabled = recordedEvents.length === 0;
     saveBtn.disabled = recordedEvents.length === 0;
-    if (practicePlayBtn) {
-      practicePlayBtn.disabled = recordedEvents.length === 0;
-    }
+    updatePracticeQueueControls();
     renderRecordingSummaryNotation(recordedEvents.length ? formatRecordingSummary(recordedEvents) : "Noch keine Aufnahme.");
     updateRecordingStatus("Aufnahme abgebrochen.");
     return;
@@ -357,9 +386,7 @@ function finalizeRecordingNow() {
     playBtn.disabled = true;
     deleteBtn.disabled = true;
     saveBtn.disabled = true;
-    if (practicePlayBtn) {
-      practicePlayBtn.disabled = true;
-    }
+    updatePracticeQueueControls();
     if (practiceTextarea) {
       practiceTextarea.value = "";
     }
@@ -374,9 +401,7 @@ function finalizeRecordingNow() {
   playBtn.disabled = false;
   deleteBtn.disabled = false;
   saveBtn.disabled = false;
-  if (practicePlayBtn) {
-    practicePlayBtn.disabled = false;
-  }
+  updatePracticeQueueControls();
 
   lastRecordingTiming = recordingTimingSnapshot;
   lastRecordingBeatTimeline = recordedBeatTimeline.slice();
@@ -409,6 +434,213 @@ function stopMetronomeAfterPlayback() {
   metronomeStartedForPlayback = false;
 }
 
+function generateTemplateName() {
+  const existing = savedTemplates.filter((tpl) => tpl.id.startsWith("user-"));
+  return `Aufnahme ${existing.length + 1}`;
+}
+
+function clearPracticeQueue() {
+  if (isPlayingBack) {
+    stopPlayback();
+  }
+  practiceQueue.length = 0;
+  renderPracticeQueue();
+  clearDropHighlights();
+  updateRecordingStatus("Übungs-Queue geleert.");
+}
+
+function removePracticeQueueItem(index) {
+  const removed = practiceQueue[index];
+  practiceQueue.splice(index, 1);
+  renderPracticeQueue();
+  if (removed) {
+    updateRecordingStatus(`Vorlage "${removed.name}" aus der Übungs-Queue entfernt.`);
+  } else {
+    updateRecordingStatus("Eintrag aus der Übungs-Queue entfernt.");
+  }
+}
+
+function movePracticeQueueItem(index, direction) {
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= practiceQueue.length) return;
+  const [entry] = practiceQueue.splice(index, 1);
+  practiceQueue.splice(newIndex, 0, entry);
+  renderPracticeQueue();
+  updateRecordingStatus(`Vorlage "${entry.name}" verschoben.`);
+}
+
+function updatePracticeQueueControls() {
+  const hasItems = practiceQueue.length > 0;
+  if (practiceHint) {
+    practiceHint.hidden = hasItems;
+  }
+  if (practiceQueuePlayBtn) {
+    practiceQueuePlayBtn.disabled = !hasItems || isRecording || isPlayingBack;
+  }
+  if (practiceQueueClearBtn) {
+    practiceQueueClearBtn.disabled = !hasItems;
+  }
+}
+
+function handleTemplateDelete(templateId) {
+  const template = savedTemplates.find((tpl) => tpl.id === templateId);
+  if (!template) return;
+  const confirmed = window.confirm(`Vorlage "${template.name}" wirklich löschen?`);
+  if (!confirmed) return;
+  savedTemplates = savedTemplates.filter((tpl) => tpl.id !== templateId);
+  practiceQueue = practiceQueue.filter((entry) => entry.templateId !== templateId);
+  renderTemplates();
+  renderPracticeQueue();
+  updateRecordingStatus(`Vorlage "${template.name}" gelöscht.`);
+}
+
+function playPracticeQueue() {
+  if (!practiceQueue.length || isRecording) return;
+  const aggregatedEvents = [];
+  let offset = 0;
+  practiceQueue.forEach((entry) => {
+    entry.events.forEach((event) => {
+      aggregatedEvents.push({
+        note: event.note,
+        time: offset + event.time,
+        duration: event.duration ?? DEFAULT_NOTE_DURATION
+      });
+    });
+    offset += getTemplateDuration(entry.events) + 0.05;
+  });
+
+  if (!aggregatedEvents.length) {
+    updateRecordingStatus("Keine Noten zum Abspielen in der Übungs-Queue.");
+    return;
+  }
+
+  const syncWithMetronome = playbackMetronomeToggle ? playbackMetronomeToggle.checked : false;
+  playDynamicSequence(aggregatedEvents, "Übungs-Queue spielt ab ...", { syncWithMetronome });
+}
+
+async function playDynamicSequence(events, statusMessage, options = {}) {
+  const ctx = await getAudioContext();
+  if (!ctx) return;
+
+  stopPlayback();
+  isPlayingBack = true;
+  recordBtn.disabled = true;
+  playBtn.disabled = true;
+  updatePracticeQueueControls();
+
+  const shouldSyncWithMetronome = options.syncWithMetronome ?? (playbackMetronomeToggle ? playbackMetronomeToggle.checked : false);
+  let tempoScale = 1;
+  const baseBeatLength = getQueueBeatLength(events);
+
+  if (shouldSyncWithMetronome && metronomeInstance) {
+    const currentBeatLength = 60 / metronomeInstance.bpm;
+    tempoScale = currentBeatLength / baseBeatLength;
+    if (!metronomeInstance.isActive()) {
+      await metronomeInstance.start();
+      metronomeStartedForPlayback = metronomeInstance.isActive();
+    } else {
+      metronomeStartedForPlayback = false;
+    }
+  } else {
+    metronomeStartedForPlayback = false;
+  }
+
+  const startAt = ctx.currentTime + 0.1;
+  let totalDuration = 0;
+
+  events.forEach((event) => {
+    const scaledStart = startAt + event.time * tempoScale;
+    const scaledDuration = Math.max(event.duration * tempoScale, 0.05);
+    totalDuration = Math.max(totalDuration, event.time * tempoScale + scaledDuration);
+    scheduleTone(ctx, event.note, scaledStart, scaledDuration, playbackGainNode ?? ctx.destination);
+  });
+
+  playbackTimeouts.push(
+    window.setTimeout(() => {
+      stopPlayback();
+      updateRecordingStatus("Wiedergabe beendet.");
+    }, totalDuration * 1000 + 200)
+  );
+
+  updateRecordingStatus(statusMessage ?? "Wiedergabe läuft ...");
+}
+
+function getTemplateDuration(events) {
+  if (!events?.length) return DEFAULT_NOTE_DURATION;
+  return events.reduce((max, event) => {
+    const duration = event.duration ?? DEFAULT_NOTE_DURATION;
+    return Math.max(max, event.time + duration);
+  }, 0);
+}
+
+function getQueueBeatLength(events) {
+  if (!events.length) return DEFAULT_NOTE_DURATION;
+  if (events.length === 1) return events[0].duration ?? DEFAULT_NOTE_DURATION;
+  const sorted = [...events].sort((a, b) => a.time - b.time);
+  for (let i = 1; i < sorted.length; i += 1) {
+    const diff = sorted[i].time - sorted[i - 1].time;
+    if (diff > 0.01) {
+      return diff;
+    }
+  }
+  return DEFAULT_NOTE_DURATION;
+}
+
+function isElementInDropArea(element) {
+  if (!element) return false;
+  if (practiceDropZone && (element === practiceDropZone || practiceDropZone.contains(element))) return true;
+  if (practiceQueueEl && (element === practiceQueueEl || practiceQueueEl.contains(element))) return true;
+  return false;
+}
+
+function setDropZoneHighlight(active) {
+  if (practiceDropZone) {
+    practiceDropZone.classList.toggle("is-drag-over", !!active);
+  }
+}
+
+function clearDropHighlights() {
+  setDropZoneHighlight(false);
+  practiceQueueEl?.classList.remove("is-drag-over");
+}
+
+function isTemplateDrag(event) {
+  const dt = event.dataTransfer;
+  if (!dt) return false;
+  return dt.types?.includes(TEMPLATE_DRAG_KEY);
+}
+
+function findTemplateById(id) {
+  return savedTemplates.find((tpl) => tpl.id === id);
+}
+
+function releasePointerCaptureSafe(target, pointerId) {
+  if (typeof target.releasePointerCapture === "function") {
+    try {
+      target.releasePointerCapture(pointerId);
+    } catch (err) {
+      // ignore
+    }
+  }
+}
+
+function cleanupTemplateTouchData(target) {
+  delete target.dataset.touchTemplateId;
+  delete target.dataset.touchStartX;
+  delete target.dataset.touchStartY;
+}
+
+function playTemplatePreview(template) {
+  if (!template?.events?.length) {
+    updateRecordingStatus("Diese Vorlage enthält keine Noten.");
+    return;
+  }
+  const clonedEvents = template.events.map((event) => ({ ...event }));
+  playDynamicSequence(clonedEvents, `Vorlage "${template.name}" spielt ab ...`, {
+    syncWithMetronome: false
+  });
+}
+
 function clearRecording(showStatus = true) {
   stopPlayback();
   recordedEvents.length = 0;
@@ -434,9 +666,7 @@ function clearRecording(showStatus = true) {
   playBtn.disabled = true;
   deleteBtn.disabled = true;
   saveBtn.disabled = true;
-    if (practicePlayBtn) {
-      practicePlayBtn.disabled = true;
-    }
+  updatePracticeQueueControls();
 
   renderRecordingSummaryNotation("Noch keine Aufnahme.");
   if (showStatus) {
@@ -461,9 +691,7 @@ async function playRecording() {
   isPlayingBack = true;
   recordBtn.disabled = true;
   playBtn.disabled = true;
-  if (practicePlayBtn) {
-    practicePlayBtn.disabled = true;
-  }
+  updatePracticeQueueControls();
 
   const shouldSyncWithMetronome = playbackMetronomeToggle ? playbackMetronomeToggle.checked : false;
   let tempoScale = 1;
@@ -520,12 +748,10 @@ function stopPlayback() {
   isPlayingBack = false;
   if (recordedEvents.length > 0) {
     playBtn.disabled = false;
-    if (practicePlayBtn) {
-      practicePlayBtn.disabled = false;
-    }
   }
   recordBtn.disabled = false;
   stopMetronomeAfterPlayback();
+  updatePracticeQueueControls();
 }
 
 function saveRecordingAsTemplate() {
@@ -534,13 +760,24 @@ function saveRecordingAsTemplate() {
     return;
   }
   const rawName = templateNameInput ? templateNameInput.value.trim() : "";
-  const name = rawName || "Unbenannte Vorlage";
+  const name = rawName || generateTemplateName();
   if (templateNameInput && !rawName) {
     templateNameInput.value = name;
   }
+
+  const template = {
+    id: `user-${Date.now()}`,
+    name,
+    description: `Aufnahme ${savedTemplates.filter((tpl) => tpl.id.startsWith("user-")).length + 1}`,
+    events: recordedEvents.map((event) => ({ ...event }))
+  };
+
+  savedTemplates.push(template);
+  renderTemplates();
+
   lastTemplateName = name;
   updatePracticeArea(name);
-  updateRecordingStatus(`Vorlage "${name}" gespeichert. Du findest sie in "Meine Uebung".`);
+  updateRecordingStatus(`Vorlage "${name}" gespeichert. Du findest sie in "Vorlagen".`);
 }
 
 function updatePracticeArea(name) {
@@ -549,9 +786,7 @@ function updatePracticeArea(name) {
   if (practiceTextarea) {
     practiceTextarea.value = `${name}: ${summary}`;
   }
-  if (practicePlayBtn) {
-    practicePlayBtn.disabled = recordedEvents.length === 0;
-  }
+  updatePracticeQueueControls();
 }
 
 function updateRecordingStatus(text) {
@@ -669,4 +904,244 @@ function clearPlaybackVisuals() {
     const el = keyElements?.get(note);
     el?.classList.remove("playback-active");
   });
+}
+
+function initializeTemplates() {
+  if (!templateGrid) return;
+  savedTemplates = DEFAULT_TEMPLATES.map((tpl, index) => ({
+    id: `default-${index}`,
+    name: tpl.name,
+    description: tpl.description,
+    events: tpl.events ? tpl.events.map((event) => ({ ...event })) : []
+  }));
+  renderTemplates();
+  renderPracticeQueue();
+}
+
+function renderTemplates() {
+  if (!templateGrid) return;
+  templateGrid.innerHTML = "";
+  savedTemplates.forEach((template) => {
+    const card = document.createElement("div");
+    card.className = "template-card";
+    card.dataset.templateId = template.id;
+
+    const header = document.createElement("div");
+    header.className = "template-card__header";
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "template-name";
+    nameEl.textContent = template.name;
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "template-card__actions";
+
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "template-card__icon-btn";
+    playBtn.setAttribute("aria-label", `Vorlage ${template.name} abspielen`);
+    playBtn.textContent = "▶";
+    playBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      playTemplatePreview(template);
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "template-card__icon-btn template-card__icon-btn--delete";
+    deleteBtn.setAttribute("aria-label", `Vorlage ${template.name} löschen`);
+    deleteBtn.textContent = "🗑";
+    deleteBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handleTemplateDelete(template.id);
+    });
+
+    actionsEl.append(playBtn, deleteBtn);
+    header.append(nameEl, actionsEl);
+    card.append(header);
+
+    card.draggable = true;
+    card.addEventListener("dragstart", (event) => handleTemplateDragStart(event, template.id));
+    card.addEventListener("dragend", handleTemplateDragEnd);
+    card.addEventListener("pointerdown", (event) => handleTemplatePointerDown(event, template.id));
+    card.addEventListener("pointermove", handleTemplatePointerMove);
+    card.addEventListener("pointerup", (event) => handleTemplatePointerUp(event, template.id));
+    card.addEventListener("pointercancel", handleTemplatePointerCancel);
+    templateGrid.appendChild(card);
+  });
+}
+
+function addTemplateToQueue(template) {
+  if (!template?.events?.length) {
+    updateRecordingStatus("Diese Vorlage enthält keine Noten.");
+    return;
+  }
+  const entry = {
+    id: `queue-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    templateId: template.id,
+    name: template.name,
+    events: template.events.map((event) => ({ ...event }))
+  };
+  practiceQueue.push(entry);
+  clearDropHighlights();
+  renderPracticeQueue();
+  updateRecordingStatus(`Vorlage "${template.name}" zur Übung hinzugefügt.`);
+}
+
+function renderPracticeQueue() {
+  if (!practiceQueueEl) return;
+  practiceQueueEl.innerHTML = "";
+  practiceQueue.forEach((entry, index) => {
+    const item = document.createElement("li");
+    item.className = "practice-queue__item";
+    item.dataset.queueId = entry.id;
+
+    const nameEl = document.createElement("p");
+    nameEl.className = "practice-queue__name";
+    nameEl.textContent = entry.name;
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "practice-queue__actions";
+
+    if (practiceQueue.length > 1) {
+      const upBtn = document.createElement("button");
+      upBtn.type = "button";
+      upBtn.className = "practice-queue__btn";
+      upBtn.setAttribute("aria-label", `${entry.name} nach oben verschieben`);
+      upBtn.textContent = "↑";
+      upBtn.disabled = index === 0;
+      upBtn.addEventListener("click", () => movePracticeQueueItem(index, -1));
+      actionsEl.append(upBtn);
+
+      const downBtn = document.createElement("button");
+      downBtn.type = "button";
+      downBtn.className = "practice-queue__btn";
+      downBtn.setAttribute("aria-label", `${entry.name} nach unten verschieben`);
+      downBtn.textContent = "↓";
+      downBtn.disabled = index === practiceQueue.length - 1;
+      downBtn.addEventListener("click", () => movePracticeQueueItem(index, 1));
+      actionsEl.append(downBtn);
+    }
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "practice-queue__btn practice-queue__btn--remove";
+    removeBtn.setAttribute("aria-label", `${entry.name} aus Übung entfernen`);
+    removeBtn.textContent = "✕";
+    removeBtn.addEventListener("click", () => removePracticeQueueItem(index));
+    actionsEl.append(removeBtn);
+
+    item.append(nameEl, actionsEl);
+    practiceQueueEl.appendChild(item);
+  });
+  updatePracticeQueueControls();
+}
+
+function handleTemplateDragStart(event, templateId) {
+  const dt = event.dataTransfer;
+  if (dt) {
+    dt.setData(TEMPLATE_DRAG_KEY, templateId);
+    dt.setData("text/plain", templateId);
+    dt.effectAllowed = "copy";
+  }
+  event.currentTarget?.classList.add("is-dragging");
+}
+
+function handleTemplateDragEnd(event) {
+  event.currentTarget?.classList.remove("is-dragging");
+  clearDropHighlights();
+}
+
+function handlePracticeQueueDragOver(event) {
+  if (!isTemplateDrag(event)) return;
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+  const target = event.currentTarget;
+  if (target && target.classList) {
+    target.classList.add("is-drag-over");
+  }
+  setDropZoneHighlight(true);
+}
+
+function handlePracticeQueueDragLeave(event) {
+  const target = event.currentTarget;
+  if (!target || !target.classList) return;
+  const related = event.relatedTarget;
+  if (!related || !target.contains(related)) {
+    target.classList.remove("is-drag-over");
+  }
+  if (!isElementInDropArea(related)) {
+    clearDropHighlights();
+  }
+}
+
+function handlePracticeQueueDrop(event) {
+  if (!isTemplateDrag(event)) return;
+  event.preventDefault();
+  const target = event.currentTarget;
+  if (target && target.classList) {
+    target.classList.remove("is-drag-over");
+  }
+  const templateId = event.dataTransfer.getData(TEMPLATE_DRAG_KEY) || event.dataTransfer.getData("text/plain");
+  const template = findTemplateById(templateId);
+  if (template) {
+    addTemplateToQueue(template);
+  }
+  clearDropHighlights();
+}
+
+function handleTemplatePointerDown(event, templateId) {
+  if (event.pointerType !== "touch") return;
+  const target = event.currentTarget;
+  if (!target || typeof target.setPointerCapture !== "function") return;
+  try {
+    target.setPointerCapture(event.pointerId);
+  } catch (err) {
+    // ignore
+  }
+  target.dataset.touchTemplateId = templateId;
+  target.dataset.touchStartX = String(event.clientX ?? 0);
+  target.dataset.touchStartY = String(event.clientY ?? 0);
+}
+
+function handleTemplatePointerUp(event, templateId) {
+  if (event.pointerType !== "touch") return;
+  const target = event.currentTarget;
+  if (!target) return;
+  releasePointerCaptureSafe(target, event.pointerId);
+  cleanupTemplateTouchData(target);
+  const template = findTemplateById(templateId);
+  if (!template) return;
+
+  const dropTarget = document.elementFromPoint(event.clientX, event.clientY);
+  const overDrop = isElementInDropArea(dropTarget);
+
+  if (overDrop) {
+    addTemplateToQueue(template);
+    clearDropHighlights();
+    return;
+  }
+
+  playTemplatePreview(template);
+  clearDropHighlights();
+}
+
+function handleTemplatePointerCancel(event) {
+  const target = event.currentTarget;
+  if (!target) return;
+  releasePointerCaptureSafe(target, event.pointerId);
+  cleanupTemplateTouchData(target);
+  clearDropHighlights();
+}
+
+function handleTemplatePointerMove(event) {
+  if (event.pointerType !== "touch") return;
+  const dropTarget = document.elementFromPoint(event.clientX, event.clientY);
+  const overDrop = isElementInDropArea(dropTarget);
+  setDropZoneHighlight(overDrop);
+  if (!overDrop) {
+    practiceQueueEl?.classList.remove("is-drag-over");
+  }
 }

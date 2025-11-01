@@ -28,3 +28,16 @@ export const RecordingPhase = Object.freeze({
 });
 
 export const BEAT_EPSILON = 1e-4;
+
+export const DEFAULT_TEMPLATES = [
+  {
+    name: "Demo",
+    description: "Vier Viertel: C - D - E - C",
+    events: [
+      { note: "C3", time: 0, duration: DEFAULT_NOTE_DURATION },
+      { note: "D3", time: DEFAULT_NOTE_DURATION, duration: DEFAULT_NOTE_DURATION },
+      { note: "E3", time: DEFAULT_NOTE_DURATION * 2, duration: DEFAULT_NOTE_DURATION },
+      { note: "C3", time: DEFAULT_NOTE_DURATION * 3, duration: DEFAULT_NOTE_DURATION }
+    ]
+  }
+];

@@ -51,17 +51,16 @@
                             </label>
                         </div>
                     </header>
-                    <div class="panel-content">
-                        <section class="recording-summary" aria-live="polite">
-                            <div class="recording-summary__header">
-                                <h3>Letzte Aufnahme</h3>
-                                <button id="practicePlay" class="btn ghost small" type="button" disabled>Abspielen</button>
-                            </div>
+                    <div class="panel-content practice-content">
+                        <section id="practiceDropZone" class="recording-summary" aria-live="polite">
+                            <p id="practiceHint" class="practice-hint">Klicke eine oder mehrere Vorlagen an, um sie in beliebiger Reihenfolge zu üben.</p>
+                            <ul id="practiceQueue" class="practice-queue" aria-label="Ausgewählte Vorlagen"></ul>
                             <div id="recordingSummaryNotation" class="recording-notation">Noch keine Aufnahme.</div>
                         </section>
-                        
+
                         <div class="cta-row">
-                            <button class="btn accent down-mid" type="button">Pattern üben</button>
+                            <button id="practiceQueuePlay" class="btn accent" type="button" disabled>▶ Üben</button>
+                            <button id="practiceQueueClear" class="btn ghost" type="button" disabled>Zuruecksetzen</button>
                         </div>
                     </div>
                 </article>
@@ -72,23 +71,7 @@
                         <h2 id="panel-templates">Vorlagen</h2>
                     </header>
                     <div class="panel-content">
-                        <div class="template-grid">
-                            <button class="template-card" type="button" aria-label="Vorlage pentatonisch">
-                                <span class="template-name">Pentatonisch</span>
-                                <span class="template-detail">1 - 2 - 3 - 5 - 6</span>
-                            </button>
-                            <button class="template-card" type="button" aria-label="Vorlage Sequenz">
-                                <span class="template-name">Sequenz</span>
-                                <span class="template-detail">aufwaerts, dann Sequenzierung</span>
-                            </button>
-                            <button class="template-card" type="button" aria-label="Vorlage Riff">
-                                <span class="template-name">Riff</span>
-                                <span class="template-detail">Syncopierter Groove</span>
-                            </button>
-                            <button class="template-card" type="button" aria-label="Vorlage Kadenz">
-                                <span class="template-name">Kadenz</span>
-                                <span class="template-detail">I - vi - ii - V</span>
-                            </button>
+                        <div class="template-grid" id="templateGrid">
                         </div>
                     </div>
                 </article>

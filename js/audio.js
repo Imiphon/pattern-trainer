@@ -44,7 +44,9 @@ export async function playPianoNote(ctx, note, when, options = {}) {
   const releaseWindow = hasDuration ? Math.min(0.2, desiredDuration * 0.6) : Math.min(0.4, buffer.duration * 0.35);
   const releaseStart = Math.max(when + attackTime, stopAt - releaseWindow);
   gain.gain.setValueAtTime(maxGain, releaseStart);
-  gain.gain.exponentialRampToValueAtTime(hasDuration ? 0.0001 : 0.002, stopAt);
+  const tailFloor = hasDuration ? 0.0001 : 0.006;
+  const tailTime = hasDuration ? 0.08 : 0.03;
+  gain.gain.exponentialRampToValueAtTime(tailFloor, stopAt);
 
   source.connect(gain).connect(destination);
   source.start(when);
@@ -59,8 +61,8 @@ export async function playPianoNote(ctx, note, when, options = {}) {
     const clampTime = Math.max(time, ctx.currentTime);
     const currentValue = gain.gain.value;
     gain.gain.setValueAtTime(currentValue, clampTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, clampTime + 0.08);
-    source.stop(clampTime + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, clampTime + tailTime);
+    source.stop(clampTime + tailTime + 0.02);
   };
 
   source.addEventListener?.("ended", () => {
