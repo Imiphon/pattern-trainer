@@ -67,8 +67,8 @@ select:focus-visible {
 }
 
 .btn.primary {
-    background: var(--primary);
-    border-color: var(--primary);
+    background: var(--green);
+    /* border-color: var(--primary); */
     color: #0b1324;
     box-shadow: 0 12px 30px rgba(74, 151, 222, 0.25);
 }
@@ -116,7 +116,7 @@ select:focus-visible {
 } */
 
 .btn.ghost {
-    background: transparent;
+    background: var(--bg);
     color: var(--text);
     border-color: var(--border);
 }
@@ -130,6 +130,47 @@ select:focus-visible {
 .btn.small {
     padding: 6px 12px;
     font-size: 0.85rem;
+}
+
+.btn-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon svg,
+.btn-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+.btn-icon svg {
+    fill: currentColor;
+}
+
+.quantize {
+    background-color: var(--brown);
+    color: white;
+    text-wrap: wrap;
+}
+
+.btn-icon-only {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon-only .btn-icon {
+    width: 26px;
+    height: 26px;
 }
 
 .btn,
@@ -208,7 +249,7 @@ select:focus-visible {
 }
 
 .template-card__icon-btn {
-    background-color: #55a14d;
+    background-color: var(--green);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text);
@@ -587,8 +628,9 @@ textarea:focus-visible {
 }
 
 .recording-controls {
+    margin-top: 12px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 16px;
 }
 
@@ -599,6 +641,156 @@ textarea:focus-visible {
     flex-wrap: wrap;
     align-items: center;
     margin-bottom: 16px;
+}
+
+.quantize-controls {
+    align-items: center;
+}
+
+.quantize-controls .btn.is-active {
+    border-color: var(--border-strong);
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.quantize-field {
+    gap: 6px;
+}
+
+.quantize-select {
+    position: relative;
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
+}
+
+.quantize-select.is-disabled .quantize-select__toggle {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.quantize-select.is-open .quantize-select__toggle {
+    border-color: var(--border-strong);
+    background: var(--brown);
+}
+
+.quantize-select__toggle {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--brown);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.quantize-select__toggle:not(:disabled):hover,
+.quantize-select__toggle:not(:disabled):focus-visible {
+    border-color: var(--border-strong);
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.quantize-select__toggle:disabled {
+    cursor: not-allowed;
+}
+
+.quantize-select__icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quantize-select__icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.quantize-select__label {
+    display: none;
+}
+
+.quantize-select__chevron {
+    display: none;
+}
+
+.quantize-select__chevron svg {
+    width: 12px;
+    height: 8px;
+}
+
+.quantize-select__list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: rgba(15, 23, 42, 0.97);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px 0;
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.45);
+    display: none;
+}
+
+.quantize-select__list.is-open {
+    display: block;
+}
+
+.quantize-select__option {
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background var(--brown), color var(--transition);
+}
+
+.quantize-select__option[aria-selected="true"],
+.quantize-select__option:hover {
+    background: var(--brown);
+    color: var(--text);
+}
+
+.quantize-select__option.is-selected {
+    font-weight: 600;
+}
+
+.quantize-select__option:focus,
+.quantize-select__option:focus-visible {
+    outline: none;
+    background: rgba(148, 163, 184, 0.2);
+}
+
+.quantize-select__option-icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quantize-select__option-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.quantize-select input[type="hidden"] {
+    display: none;
+}
+
+.save {
+    background-color: var(--bg);
+    color: var(--accent);
 }
 
 .recording-secondary input {

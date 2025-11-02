@@ -232,9 +232,6 @@
   background: rgba(15, 23, 42, 0.85);
 }
 
-.keyboard-area {
-  margin-top: 40px;
-}
 
 @media (max-width: 960px) {
   .panel-grid {
@@ -281,9 +278,6 @@
     padding: 24px;
   }
 
-  .keyboard-area {
-    margin-top: 28px;
-  }
 }
 
 @media (max-width: 480px) {

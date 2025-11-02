@@ -32,10 +32,12 @@
                     </header>
                     <div class="panel-content">
                         <ol class="instruction-list">
-                            <li>Spiele ein neues Pattern ein, indem du Tempo und Takt einstellst, Aufnahme, Stopp und Vorlage speichern klickst. Oder greife auf die vorandenen zu.</li>
+                            <li>Spiele ein neues Pattern ein, indem du Tempo und Takt einstellst, Aufnahme, Stopp und
+                                Vorlage speichern klickst. Oder greife auf die vorandenen zu.</li>
                             <li>Höre dir die Vorlage(n) an, ziehe sie in "Meine Übung" und ordne sie beliebig.</li>
-                            <li>Bestimme, wie oft du es hintereinander(!) richtig spielen willst, das tempo und die Länge der Pausen zwischen den Wiederholungen.</li>
-                            <li>Klicke "Play" in "Meine Übung" und spiele die Vorlage(n) mit oder ohne Playback.</li>                            
+                            <li>Bestimme, wie oft du es hintereinander(!) richtig spielen willst, das tempo und die
+                                Länge der Pausen zwischen den Wiederholungen.</li>
+                            <li>Klicke "Play" in "Meine Übung" und spiele die Vorlage(n) mit oder ohne Playback.</li>
                         </ol>
                     </div>
                 </article>
@@ -44,7 +46,7 @@
                     <header class="panel-header panel-header--practice">
                         <div class="header-frame">
                             <h2 id="panel-practice">Meine Uebung</h2>
-                        <button id="practiceQueueClear" class="btn ghost small" type="button" disabled>Neu</button>
+                            <button id="practiceQueueClear" class="btn ghost small" type="button" disabled>Neu</button>
                         </div>
                         <div class="panel-header__actions panel-header__actions--practice">
                             <div class="playback-controls">
@@ -61,7 +63,8 @@
                     </header>
                     <div class="panel-content practice-content">
                         <section id="practiceDropZone" class="recording-summary" aria-live="polite">
-                            <p id="practiceHint" class="practice-hint">Zieh hier die Vorlagen rein, um sie in beliebiger Reihenfolge zu üben.</p>
+                            <p id="practiceHint" class="practice-hint">Zieh hier die Vorlagen rein, um sie in beliebiger
+                                Reihenfolge zu üben.</p>
                             <ul id="practiceQueue" class="practice-queue" aria-label="Ausgewählte Vorlagen"></ul>
                             <div id="recordingSummaryNotation" class="recording-notation">Noch keine Aufnahme.</div>
                         </section>
@@ -96,42 +99,43 @@
 
                 <article class="panel">
                     <article class="panel panel--templates" aria-labelledby="panel-templates">
-                    <header class="panel-header">
-                        <h2 id="panel-templates">Vorlagen</h2>
-                    </header>
-                    <div class="panel-content">
-                        <div class="template-grid" id="templateGrid">
+                        <header class="panel-header">
+                            <h2 id="panel-templates">Vorlagen</h2>
+                        </header>
+                        <div class="panel-content">
+                            <div class="template-grid" id="templateGrid">
+                            </div>
                         </div>
-                    </div>
-                </article>
+                    </article>
 
-                <article class="panel panel--metronome" aria-labelledby="panel-metronome">
-                    <header class="panel-header panel-header--metronome">
-                        <div class="panel-header__info">
-                            <h2 id="panel-metronome">Metronom</h2>
-                            <label class="volume-control">
-                                <span class="field-label">Vol.</span>
-                                <input id="metronomeVolume" type="range" min="0" max="100" value="80" />
-                            </label>
+                    <article class="panel panel--metronome" aria-labelledby="panel-metronome">
+                        <header class="panel-header panel-header--metronome">
+                            <div class="panel-header__info">
+                                <h2 id="panel-metronome">Metronom</h2>
+                                <label class="volume-control">
+                                    <span class="field-label">Vol.</span>
+                                    <input id="metronomeVolume" type="range" min="0" max="100" value="80" />
+                                </label>
+                            </div>
+                            <button id="metronomeToggle" class="btn ghost" type="button">Start</button>
+                        </header>
+                        <div class="panel-content metronome-content">
+                            <div class="metronome-fields">
+                                <label class="field">
+                                    <span class="field-label">BPM</span>
+                                    <input id="metronomeBpm" type="number" min="30" max="220" value="96" />
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Beats/Takt</span>
+                                    <input id="metronomeBeats" type="number" min="1" max="12" value="4" />
+                                </label>
+                            </div>
                         </div>
-                        <button id="metronomeToggle" class="btn ghost" type="button">Start</button>
-                    </header>
-                    <div class="panel-content metronome-content">
-                        <div class="metronome-fields">
-                            <label class="field">
-                                <span class="field-label">BPM</span>
-                                <input id="metronomeBpm" type="number" min="30" max="220" value="96" />
-                            </label>
-                            <label class="field">
-                                <span class="field-label">Beats/Takt</span>
-                                <input id="metronomeBeats" type="number" min="1" max="12" value="4" />
-                            </label>
-                        </div>
-                    </div>
-                </article>
+                    </article>
             </section>
 
-            <p class="orientation-hint" role="status">Bitte im Querformat verwenden, um alle Panels optimal zu sehen.</p>
+            <p class="orientation-hint" role="status">Bitte im Querformat verwenden, um alle Panels optimal zu sehen.
+            </p>
 
             <section class="keyboard-area" aria-label="Keyboardaufnahme">
                 <article class="panel keyboard-panel" aria-labelledby="panel-keyboard">
@@ -144,20 +148,74 @@
                             </label>
                         </div>
                     </header>
-                        <div class="recording-controls">
-                            <div class="recording-primary">
-                                <button id="recordBtn" class="btn accent" type="button">Aufnahme</button>
-                                <button id="stopBtn" class="btn ghost" type="button" disabled>Stopp</button>
-                                <button id="playBtn" class="btn primary" type="button" disabled>Abspielen</button>
-                           
-                                <label class="field sr-only" for="templateName">Vorlagenname</label>
-                                <input id="templateName" type="text" placeholder="Vorlage benennen" autocomplete="off" />
-                                <button id="saveBtn" class="btn ghost" type="button" disabled>Als Vorlage speichern</button>
-                                <button id="deleteBtn" class="btn danger" type="button" disabled>Loeschen</button>
-                            </div>
+                    <div class="recording-controls">
+                        <div class="recording-primary">
+                            <button id="recordBtn" class="btn accent btn-icon-only" type="button" aria-label="Aufnahme">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <circle cx="12" cy="12" r="8" />
+                                    </svg>
+                                </span>
+                                <span class="sr-only">Aufnahme</span>
+                            </button>
+                            <button id="stopBtn" class="btn ghost btn-icon-only" type="button" disabled aria-label="Stopp">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <rect x="7" y="7" width="10" height="10" rx="1.5" ry="1.5" />
+                                    </svg>
+                                </span>
+                                <span class="sr-only">Stopp</span>
+                            </button>
+                            <button id="playBtn" class="btn primary btn-icon-only" type="button" disabled aria-label="Abspielen">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M9 7.5v9l7-4.5z" />
+                                    </svg>
+                                </span>
+                                <span class="sr-only">Abspielen</span>
+                            </button>
+                            <label class="field sr-only" for="templateName">Vorlagenname</label>
+                            <input id="templateName" type="text" placeholder="Vorlage benennen" autocomplete="off" />
+                            <button id="saveBtn" class="btn save" type="button" disabled>Speichern</button>
+                            <button id="deleteBtn" class="btn danger btn-icon-only" type="button" disabled aria-label="Loeschen">
+                                <span class="btn-icon" aria-hidden="true">
+                                    <img src="./assets/images/trash-white32.png" alt="">
+                                </span>
+                                <span class="sr-only">Loeschen</span>
+                            </button>
                         </div>
+                        <div class="recording-secondary quantize-controls">
+                            <button id="quantizeToggle" class="btn quantize" type="button" disabled>Quantisierung: Aus</button>
+                            <label class="field quantize-field">
+                                <span class="field-label">Raster</span>
+                                <div class="quantize-select is-disabled" data-quantize-select>
+                                    <button
+                                        id="quantizeModeToggle"
+                                        class="quantize-select__toggle"
+                                        type="button"
+                                        disabled
+                                        aria-haspopup="listbox"
+                                        aria-expanded="false"
+                                        aria-controls="quantizeModeList"
+                                    >
+                                        <span class="quantize-select__icon" aria-hidden="true">
+                                            <img src="./assets/images/notes/1-4.png" alt="">
+                                        </span>
+                                        <!-- <span class="quantize-select__label">Viertel</span> -->
+                                        <span class="quantize-select__chevron" aria-hidden="true">
+                                            <svg viewBox="0 0 12 8" focusable="false">
+                                                <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </span>
+                                    </button>
+                                    <ul id="quantizeModeList" class="quantize-select__list" role="listbox" aria-hidden="true" aria-labelledby="quantizeModeToggle"></ul>
+                                    <input type="hidden" id="quantizeMode" value="quarter" />
+                                </div>
+                            </label>
+                        </div>
+                    </div>
                     <div class="panel-content keyboard-content">
-                        
+
                         <div id="trainerKeyboard" class="keyboard" role="application"
                             aria-label="Klaviertastatur (C3-B4)"></div>
                         <p id="recordingStatus" class="recording-status">Bereit fuer Aufnahme.</p>

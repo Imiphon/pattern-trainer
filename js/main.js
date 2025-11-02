@@ -56,6 +56,29 @@ const playbackMetronomeToggle = document.getElementById("playbackMetronomeToggle
 
 const TEMPLATE_DRAG_KEY = "application/x-template-id";
 const QUEUE_DRAG_KEY = "application/x-practice-queue-index";
+const QUANTIZE_PRESETS = [
+  { value: "whole", label: "Ganze", beatMultiplier: 4, icon: "./assets/images/notes/1-1.png" },
+  { value: "half", label: "Halbe", beatMultiplier: 2, icon: "./assets/images/notes/1-2.png" },
+  { value: "quarter", label: "Viertel", beatMultiplier: 1, icon: "./assets/images/notes/1-4.png" },
+  { value: "eighth", label: "Achtel", beatMultiplier: 0.5, icon: "./assets/images/notes/1-8.png" },
+  { value: "sixteenth", label: "Sechzehntel", beatMultiplier: 0.25, icon: "./assets/images/notes/1-16.png" },
+  { value: "eighthTriplet", label: "Achtel-Triolen", beatMultiplier: 1 / 3, icon: "./assets/images/notes/3-8.png" }
+];
+const QUANTIZE_RESOLUTIONS = QUANTIZE_PRESETS.reduce((acc, preset) => {
+  acc[preset.value] = { label: preset.label, beatMultiplier: preset.beatMultiplier };
+  return acc;
+}, {});
+const DEFAULT_QUANTIZE_MODE = "quarter";
+const NOTE_TIME_EPSILON = 0.0001;
+const EXTRA_SUSTAIN_SECONDS = 0.1;
+const MAX_FORCED_SUSTAIN_RATIO = 2.5;
+const quantizeToggleBtn = document.getElementById("quantizeToggle");
+const quantizeModeSelect = document.getElementById("quantizeMode");
+const quantizeSelectWrapper = document.querySelector("[data-quantize-select]");
+const quantizeModeToggleBtn = document.getElementById("quantizeModeToggle");
+const quantizeModeList = document.getElementById("quantizeModeList");
+let quantizeOptionElements = [];
+const quantizeOptionData = new Map();
 
 let keyboardGainNode = null;
 let playbackGainNode = null;
@@ -68,6 +91,54 @@ const activeKeyboardSources = new Map();
 let savedTemplates = [];
 let practiceQueue = [];
 let draggingQueueIndex = null;
+let isQuantizationEnabled = false;
+let lastQuantizeMode = DEFAULT_QUANTIZE_MODE;
+let isQuantizeMenuOpen = false;
+let quantizeFocusedOptionIndex = -1;
+
+function renderQuantizeOptions() {
+  if (!quantizeModeList) return;
+  quantizeModeList.innerHTML = "";
+  quantizeOptionData.clear();
+
+  QUANTIZE_PRESETS.forEach(({ value, label, icon }, index) => {
+    const option = document.createElement("li");
+    option.className = "quantize-select__option";
+    option.setAttribute("role", "option");
+    option.dataset.value = value;
+    option.dataset.label = label;
+    if (icon) {
+      option.dataset.icon = icon;
+    }
+    option.setAttribute("tabindex", "-1");
+    option.setAttribute("aria-selected", "false");
+
+  const iconWrapper = document.createElement("span");
+  iconWrapper.className = "quantize-select__option-icon";
+  iconWrapper.setAttribute("aria-hidden", "true");
+  const img = document.createElement("img");
+  img.src = icon;
+  img.alt = "";
+  iconWrapper.appendChild(img);
+  option.appendChild(iconWrapper);
+
+    quantizeModeList.appendChild(option);
+    quantizeOptionData.set(value, { label, icon, index });
+  });
+
+  quantizeOptionElements = Array.from(quantizeModeList.querySelectorAll(".quantize-select__option"));
+  quantizeOptionElements.forEach((option, index) => {
+    option.addEventListener("click", () => {
+      if (quantizeModeToggleBtn?.disabled) return;
+      const { value } = option.dataset;
+      if (!value) return;
+      selectQuantizeOption(value);
+    });
+    option.addEventListener("keydown", (event) => handleQuantizeOptionKeydown(event, index));
+  });
+}
+
+renderQuantizeOptions();
 
 if (keyboardEl) {
   keyElements = createKeyboard(keyboardEl, triggerNotePlayback);
@@ -137,6 +208,47 @@ if (practicePauseBarsSelect) {
     updateRecordingStatus(`Pause vor Wiederholung: ${practicePauseBarsSelect.value} Takte`);
   });
 }
+
+if (quantizeToggleBtn && quantizeModeSelect) {
+  quantizeToggleBtn.addEventListener("click", () => {
+    if (!recordedEvents.length) return;
+    isQuantizationEnabled = !isQuantizationEnabled;
+    updateQuantizationControls();
+    refreshQuantizationPreview();
+  });
+  quantizeModeSelect.addEventListener("change", () => {
+    const selectedValue = getSelectedQuantizeMode();
+    updateQuantizeToggleDisplay(selectedValue);
+    updateQuantizeOptionSelection(selectedValue);
+    if (recordedEvents.length && isQuantizationEnabled) {
+      refreshQuantizationPreview();
+    }
+  });
+}
+
+if (quantizeModeToggleBtn) {
+  quantizeModeToggleBtn.addEventListener("click", () => {
+    if (quantizeModeToggleBtn.disabled) return;
+    if (isQuantizeMenuOpen) {
+      closeQuantizeMenu(true);
+    } else {
+      openQuantizeMenu();
+    }
+  });
+  quantizeModeToggleBtn.addEventListener("keydown", handleQuantizeToggleKeydown);
+}
+
+if (quantizeModeSelect) {
+  let initialValue = quantizeModeSelect.value || DEFAULT_QUANTIZE_MODE;
+  if (!quantizeOptionData.has(initialValue)) {
+    initialValue = quantizeOptionElements[0]?.dataset.value ?? DEFAULT_QUANTIZE_MODE;
+    quantizeModeSelect.value = initialValue;
+  }
+  selectQuantizeOption(initialValue, { closeMenu: false, silent: true });
+  lastQuantizeMode = initialValue;
+}
+
+updateQuantizationControls();
 
 if (metronomeToggleBtn && metronomeBpmInput && metronomeBeatsInput) {
   metronomeInstance = new SimpleMetronome({
@@ -246,6 +358,7 @@ async function startRecording() {
   recordingTimingSnapshot = null;
   recordedBeatTimeline = [];
   recordedEvents.length = 0;
+  resetQuantizationState();
   recordStartTime = 0;
   stopPending = false;
   stopTargetBeat = null;
@@ -344,6 +457,7 @@ function stopRecording() {
     updatePracticeQueueControls();
     renderRecordingSummaryNotation(recordedEvents.length ? formatRecordingSummary(recordedEvents) : "Noch keine Aufnahme.");
     updateRecordingStatus("Aufnahme abgebrochen.");
+    updateQuantizationControls();
     return;
   }
 
@@ -419,6 +533,7 @@ function finalizeRecordingNow() {
   deleteBtn.disabled = false;
   saveBtn.disabled = false;
   updatePracticeQueueControls();
+  updateQuantizationControls();
 
   lastRecordingTiming = recordingTimingSnapshot;
   lastRecordingBeatTimeline = recordedBeatTimeline.slice();
@@ -684,16 +799,28 @@ async function playDynamicSequence(events, statusMessage, options = {}) {
 
   const startDelay = 0.1 + countInDuration;
   const startAt = ctx.currentTime + startDelay;
-  let totalDuration = 0;
+  const nextEventTimes = computeNextEventTimes(events);
+  let relativeEndMax = 0;
 
-  events.forEach((event) => {
+  events.forEach((event, index) => {
     const scaledStart = startAt + event.time * tempoScale;
-    const scaledDuration = Math.max(event.duration * tempoScale, 0.05);
-    totalDuration = Math.max(totalDuration, event.time * tempoScale + scaledDuration);
-    scheduleTone(ctx, event.note, scaledStart, scaledDuration, playbackGainNode ?? ctx.destination);
+    const rawDuration = event.duration ?? DEFAULT_NOTE_DURATION;
+    const baseDurationSeconds = Math.max(rawDuration * tempoScale, 0.05);
+    const nextTime = nextEventTimes[index];
+    const gapSeconds = nextTime != null ? Math.max(0, (nextTime - event.time) * tempoScale) : null;
+    const sustainDuration = resolveSustainDuration(baseDurationSeconds, gapSeconds);
+    const playbackDuration = sustainDuration ?? undefined;
+    const highlightDurationMs = estimateHighlightDuration(baseDurationSeconds, sustainDuration);
+
+    relativeEndMax = Math.max(
+      relativeEndMax,
+      event.time * tempoScale + (sustainDuration ?? baseDurationSeconds + EXTRA_SUSTAIN_SECONDS)
+    );
+
+    scheduleTone(ctx, event.note, scaledStart, playbackDuration, playbackGainNode ?? ctx.destination, highlightDurationMs);
   });
 
-  const overallDuration = totalDuration + startDelay;
+  const overallDuration = relativeEndMax + startDelay;
   playbackTimeouts.push(
     window.setTimeout(() => {
       stopPlayback();
@@ -803,6 +930,7 @@ function playTemplatePreview(template) {
 function clearRecording(showStatus = true) {
   stopPlayback();
   recordedEvents.length = 0;
+  resetQuantizationState();
   isRecording = false;
   recordStartTime = 0;
   lastTemplateName = "";
@@ -876,16 +1004,34 @@ async function playRecording() {
   }
 
   const startAt = ctx.currentTime + 0.08;
-  const lastEvent = recordedEvents[recordedEvents.length - 1];
-  const totalDuration = lastEvent.time * tempoScale + lastEvent.duration * tempoScale + 0.25;
+  const playbackEvents = getPlaybackRecordingEvents();
+  if (!playbackEvents.length) {
+    stopPlayback();
+    updateRecordingStatus("Keine Noten zum Abspielen vorhanden.");
+    return;
+  }
+  const nextEventTimes = computeNextEventTimes(playbackEvents);
+  let relativeEndMax = 0;
 
-  recordedEvents.forEach((event, index) => {
+  playbackEvents.forEach((event, index) => {
     const eventStart = startAt + event.time * tempoScale;
-    const nextEvent = recordedEvents[index + 1];
-    const eventDuration = nextEvent ? Math.max((nextEvent.time - event.time) * tempoScale, 0.06) : undefined;
-    scheduleTone(ctx, event.note, eventStart, eventDuration, playbackGainNode ?? ctx.destination);
+    const rawDuration = event.duration ?? DEFAULT_NOTE_DURATION;
+    const baseDurationSeconds = Math.max(rawDuration * tempoScale, 0.05);
+    const nextTime = nextEventTimes[index];
+    const gapSeconds = nextTime != null ? Math.max(0, (nextTime - event.time) * tempoScale) : null;
+    const sustainDuration = resolveSustainDuration(baseDurationSeconds, gapSeconds);
+    const playbackDuration = sustainDuration ?? undefined;
+    const highlightDurationMs = estimateHighlightDuration(baseDurationSeconds, sustainDuration);
+
+    relativeEndMax = Math.max(
+      relativeEndMax,
+      event.time * tempoScale + (sustainDuration ?? baseDurationSeconds + EXTRA_SUSTAIN_SECONDS)
+    );
+
+    scheduleTone(ctx, event.note, eventStart, playbackDuration, playbackGainNode ?? ctx.destination, highlightDurationMs);
   });
 
+  const totalDuration = relativeEndMax + 0.25;
   playbackTimeouts.push(
     window.setTimeout(() => {
       stopPlayback();
@@ -924,11 +1070,12 @@ function saveRecordingAsTemplate() {
     templateNameInput.value = name;
   }
 
+  const sourceEvents = getPlaybackRecordingEvents();
   const template = {
     id: `user-${Date.now()}`,
     name,
     description: `Aufnahme ${savedTemplates.filter((tpl) => tpl.id.startsWith("user-")).length + 1}`,
-    events: recordedEvents.map((event) => ({ ...event }))
+    events: sourceEvents.map((event) => ({ ...event }))
   };
 
   savedTemplates.push(template);
@@ -940,7 +1087,8 @@ function saveRecordingAsTemplate() {
 }
 
 function updatePracticeArea(name) {
-  const summary = formatRecordingSummary(recordedEvents);
+  const eventsForSummary = getDisplayRecordingEvents();
+  const summary = formatRecordingSummary(eventsForSummary);
   renderRecordingSummaryNotation(summary);
   if (practiceTextarea) {
     practiceTextarea.value = `${name}: ${summary}`;
@@ -1022,7 +1170,316 @@ function stopActiveKeyboardNote(note, time = audioCtx?.currentTime ?? 0) {
   });
 }
 
-function scheduleTone(ctx, note, when, duration, destination) {
+function computeNextEventTimes(events) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  const order = events.map((_, index) => index).sort((a, b) => {
+    const aTime = events[a]?.time ?? 0;
+    const bTime = events[b]?.time ?? 0;
+    return aTime - bTime;
+  });
+  const nextTimes = new Array(events.length).fill(null);
+  order.forEach((currentIdx, orderedPosition) => {
+    const currentTime = events[currentIdx]?.time;
+    if (typeof currentTime !== "number") return;
+    for (let offset = orderedPosition + 1; offset < order.length; offset += 1) {
+      const candidateIdx = order[offset];
+      const candidateTime = events[candidateIdx]?.time;
+      if (typeof candidateTime !== "number") continue;
+      if (candidateTime - currentTime > NOTE_TIME_EPSILON) {
+        nextTimes[currentIdx] = candidateTime;
+        break;
+      }
+    }
+  });
+  return nextTimes;
+}
+
+function resolveSustainDuration(baseDurationSeconds, gapSeconds) {
+  const safeBase = Math.max(baseDurationSeconds, 0.05);
+  if (gapSeconds == null || !Number.isFinite(gapSeconds)) {
+    return null;
+  }
+  if (gapSeconds > safeBase * MAX_FORCED_SUSTAIN_RATIO) {
+    return null;
+  }
+  return Math.max(safeBase, gapSeconds + EXTRA_SUSTAIN_SECONDS);
+}
+
+function estimateHighlightDuration(baseDurationSeconds, sustainDurationSeconds) {
+  const fallback = sustainDurationSeconds ?? baseDurationSeconds + EXTRA_SUSTAIN_SECONDS;
+  return Math.max(50, fallback * 1000);
+}
+
+function getSelectedQuantizeMode() {
+  if (!quantizeModeSelect) {
+    return QUANTIZE_RESOLUTIONS[lastQuantizeMode] ? lastQuantizeMode : DEFAULT_QUANTIZE_MODE;
+  }
+  const rawValue = quantizeModeSelect.value || lastQuantizeMode || DEFAULT_QUANTIZE_MODE;
+  const resolved = QUANTIZE_RESOLUTIONS[rawValue] ? rawValue : DEFAULT_QUANTIZE_MODE;
+  lastQuantizeMode = resolved;
+  return resolved;
+}
+
+function getRecordingBeatLengthSeconds() {
+  if (
+    lastRecordingTiming &&
+    Number.isFinite(lastRecordingTiming.beatLengthSeconds) &&
+    lastRecordingTiming.beatLengthSeconds > 0
+  ) {
+    return lastRecordingTiming.beatLengthSeconds;
+  }
+  const inferred = getQueueBeatLength(recordedEvents);
+  if (Number.isFinite(inferred) && inferred > 0) {
+    return inferred;
+  }
+  return DEFAULT_NOTE_DURATION;
+}
+
+function getQuantizationGridSeconds(mode) {
+  const setting = QUANTIZE_RESOLUTIONS[mode];
+  if (!setting) return null;
+  const beatLength = getRecordingBeatLengthSeconds();
+  if (!Number.isFinite(beatLength) || beatLength <= 0) return null;
+  const grid = beatLength * setting.beatMultiplier;
+  return grid > 0 ? grid : null;
+}
+
+function quantizeEvents(events, gridSeconds) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  if (!gridSeconds || !Number.isFinite(gridSeconds) || gridSeconds <= 0) {
+    return events.map((event) => ({ ...event }));
+  }
+  const quantized = events.map((event, index) => {
+    const target = Math.round((event.time ?? 0) / gridSeconds) * gridSeconds;
+    const clamped = Math.max(0, target);
+    return { ...event, time: clamped, __index: index };
+  });
+  quantized.sort((a, b) => {
+    if (Math.abs(a.time - b.time) > NOTE_TIME_EPSILON) {
+      return a.time - b.time;
+    }
+    return a.__index - b.__index;
+  });
+  quantized.forEach((event) => {
+    delete event.__index;
+  });
+  return quantized;
+}
+
+function getQuantizedRecordingEvents() {
+  if (!recordedEvents.length) return [];
+  const mode = getSelectedQuantizeMode();
+  const gridSeconds = getQuantizationGridSeconds(mode);
+  return quantizeEvents(recordedEvents, gridSeconds);
+}
+
+function getPlaybackRecordingEvents() {
+  if (!recordedEvents.length) return [];
+  if (isQuantizationEnabled) {
+    return getQuantizedRecordingEvents();
+  }
+  return recordedEvents.map((event) => ({ ...event }));
+}
+
+function getDisplayRecordingEvents() {
+  if (!recordedEvents.length) return [];
+  return isQuantizationEnabled ? getQuantizedRecordingEvents() : recordedEvents;
+}
+
+function updateQuantizeToggleDisplay(value) {
+  if (!quantizeModeToggleBtn) return;
+  const data =
+    quantizeOptionData.get(value) ||
+    (quantizeOptionElements.length ? quantizeOptionData.get(quantizeOptionElements[0].dataset.value) : null);
+  const labelEl = quantizeModeToggleBtn.querySelector(".quantize-select__label");
+  const iconImg = quantizeModeToggleBtn.querySelector(".quantize-select__icon img");
+  const label = data?.label ?? value ?? "";
+  if (labelEl) {
+    labelEl.textContent = label;
+  }
+  if (iconImg) {
+    if (data?.icon) {
+      iconImg.src = data.icon;
+      iconImg.alt = label;
+      iconImg.style.visibility = "";
+    } else {
+      iconImg.src = "";
+      iconImg.alt = "";
+      iconImg.style.visibility = "hidden";
+    }
+  }
+}
+
+function updateQuantizeOptionSelection(value) {
+  let selectedIndex = -1;
+  quantizeOptionElements.forEach((option, index) => {
+    const isSelected = option.dataset.value === value;
+    option.classList.toggle("is-selected", isSelected);
+    option.setAttribute("aria-selected", isSelected ? "true" : "false");
+    option.setAttribute("tabindex", isSelected ? "0" : "-1");
+    if (isSelected) {
+      selectedIndex = index;
+    }
+  });
+  if (selectedIndex >= 0) {
+    quantizeFocusedOptionIndex = selectedIndex;
+  }
+}
+
+function selectQuantizeOption(value, { closeMenu = true, focusToggle = true, silent = false } = {}) {
+  if (!quantizeModeSelect || !quantizeOptionData.has(value)) return;
+  const previousValue = quantizeModeSelect.value;
+  quantizeModeSelect.value = value;
+  updateQuantizeToggleDisplay(value);
+  updateQuantizeOptionSelection(value);
+  if (closeMenu) {
+    closeQuantizeMenu(focusToggle);
+  }
+  if (!silent && value !== previousValue) {
+    quantizeModeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+function openQuantizeMenu() {
+  if (isQuantizeMenuOpen || !quantizeModeList || !quantizeModeToggleBtn) return;
+  isQuantizeMenuOpen = true;
+  quantizeModeToggleBtn.setAttribute("aria-expanded", "true");
+  quantizeModeList.classList.add("is-open");
+  quantizeModeList.setAttribute("aria-hidden", "false");
+  quantizeSelectWrapper?.classList.add("is-open");
+  document.addEventListener("click", handleQuantizeOutsideClick);
+  document.addEventListener("keydown", handleQuantizeGlobalKeydown);
+  const currentValue = quantizeModeSelect?.value ?? DEFAULT_QUANTIZE_MODE;
+  const selectedIndex = quantizeOptionData.get(currentValue)?.index ?? 0;
+  focusQuantizeOption(selectedIndex);
+}
+
+function closeQuantizeMenu(focusToggle = false) {
+  if (!isQuantizeMenuOpen) return;
+  isQuantizeMenuOpen = false;
+  quantizeModeToggleBtn?.setAttribute("aria-expanded", "false");
+  quantizeModeList?.classList.remove("is-open");
+  quantizeModeList?.setAttribute("aria-hidden", "true");
+  quantizeSelectWrapper?.classList.remove("is-open");
+  document.removeEventListener("click", handleQuantizeOutsideClick);
+  document.removeEventListener("keydown", handleQuantizeGlobalKeydown);
+  if (focusToggle && quantizeModeToggleBtn && !quantizeModeToggleBtn.disabled) {
+    quantizeModeToggleBtn.focus();
+  }
+}
+
+function focusQuantizeOption(index) {
+  if (!quantizeOptionElements.length) return;
+  const count = quantizeOptionElements.length;
+  const targetIndex = ((index % count) + count) % count;
+  quantizeOptionElements.forEach((option, idx) => {
+    option.setAttribute("tabindex", idx === targetIndex ? "0" : "-1");
+  });
+  quantizeFocusedOptionIndex = targetIndex;
+  const option = quantizeOptionElements[targetIndex];
+  option.focus();
+}
+
+function handleQuantizeToggleKeydown(event) {
+  if (quantizeModeToggleBtn?.disabled) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (!isQuantizeMenuOpen) {
+      openQuantizeMenu();
+    }
+    const currentValue = quantizeModeSelect?.value ?? DEFAULT_QUANTIZE_MODE;
+    const selectedIndex = quantizeOptionData.get(currentValue)?.index ?? 0;
+    focusQuantizeOption(selectedIndex);
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    if (isQuantizeMenuOpen) {
+      closeQuantizeMenu(true);
+    } else {
+      openQuantizeMenu();
+    }
+  }
+}
+
+function handleQuantizeOptionKeydown(event, index) {
+  if (!isQuantizeMenuOpen) return;
+  const option = quantizeOptionElements[index];
+  if (!option) return;
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    focusQuantizeOption(index + 1);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    focusQuantizeOption(index - 1);
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    const value = option.dataset.value;
+    if (value) {
+      selectQuantizeOption(value);
+    }
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    closeQuantizeMenu(true);
+  }
+}
+
+function handleQuantizeOutsideClick(event) {
+  if (!isQuantizeMenuOpen) return;
+  if (!quantizeSelectWrapper?.contains(event.target)) {
+    closeQuantizeMenu();
+  }
+}
+
+function handleQuantizeGlobalKeydown(event) {
+  if (!isQuantizeMenuOpen) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeQuantizeMenu(true);
+  } else if (event.key === "Tab") {
+    closeQuantizeMenu();
+  }
+}
+
+function refreshQuantizationPreview() {
+  if (!recordedEvents.length) {
+    renderRecordingSummaryNotation("Noch keine Aufnahme.");
+    updateQuantizationControls();
+    return;
+  }
+  const label =
+    templateNameInput?.value?.trim() || lastTemplateName || "Letzte Aufnahme";
+  updatePracticeArea(label);
+}
+
+function updateQuantizationControls() {
+  if (!quantizeToggleBtn || !quantizeModeSelect) return;
+  const hasEvents = recordedEvents.length > 0;
+  if (!hasEvents && isQuantizationEnabled) {
+    isQuantizationEnabled = false;
+  }
+  quantizeToggleBtn.disabled = !hasEvents;
+  quantizeToggleBtn.textContent = `Quantisierung: ${isQuantizationEnabled ? "An" : "Aus"}`;
+  quantizeToggleBtn.setAttribute("aria-pressed", isQuantizationEnabled ? "true" : "false");
+  quantizeToggleBtn.classList.toggle("is-active", isQuantizationEnabled);
+  const shouldDisableSelector = !hasEvents;
+  quantizeModeSelect.disabled = shouldDisableSelector;
+  if (quantizeModeToggleBtn) {
+    quantizeModeToggleBtn.disabled = shouldDisableSelector;
+  }
+  quantizeSelectWrapper?.classList.toggle("is-disabled", shouldDisableSelector);
+  if (shouldDisableSelector) {
+    closeQuantizeMenu();
+  }
+  updateQuantizeToggleDisplay(quantizeModeSelect.value || DEFAULT_QUANTIZE_MODE);
+}
+
+function resetQuantizationState() {
+  if (!quantizeToggleBtn || !quantizeModeSelect) return;
+  isQuantizationEnabled = false;
+  closeQuantizeMenu();
+  updateQuantizationControls();
+}
+
+function scheduleTone(ctx, note, when, duration, destination, highlightMs) {
   playPianoNote(ctx, note, when, {
     duration,
     destination: destination ?? ctx.destination
@@ -1030,7 +1487,7 @@ function scheduleTone(ctx, note, when, duration, destination) {
     console.error("Konnte Pianoton nicht planen:", error);
   });
   const delay = Math.max(0, (when - ctx.currentTime) * 1000);
-  const highlightDuration = Math.max(50, (duration ?? DEFAULT_NOTE_DURATION) * 1000);
+  const highlightDuration = highlightMs ?? Math.max(50, (duration ?? DEFAULT_NOTE_DURATION) * 1000);
   const timeoutId = window.setTimeout(() => {
     flashKey(note, "playback-active", highlightDuration);
   }, delay);
