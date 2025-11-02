@@ -31,11 +31,15 @@ select {
     width: min-content;
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     color: var(--text);
     font: inherit;
-    padding: 10px 12px;
+    text-align: center;
     transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+#templateName {
+padding: 10px 12px;
 }
 
 .field input:focus-visible,
@@ -55,6 +59,7 @@ select:focus-visible {
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
+    border-radius: 12px;
 }
 
 .btn {
@@ -292,7 +297,7 @@ select:focus-visible {
 }
 
 .recording-summary {
-    background: rgba(15, 23, 42, 0.6);
+    background: var(--bg-panel-strong);
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 8px;
@@ -522,7 +527,8 @@ textarea:focus-visible {
 .practice-content .cta-row {
     position: sticky;
     bottom: 0;
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.85));
+    /* background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.85)); */
+    background: var(--bg-panel-strong);
     padding: 12px 0 8px;
     z-index: 2;
 }
@@ -628,7 +634,7 @@ textarea:focus-visible {
 }
 
 .recording-controls {
-    margin-top: 12px;
+    margin: 12px;
     display: flex;
     flex-direction: row;
     gap: 16px;
@@ -641,15 +647,30 @@ textarea:focus-visible {
     flex-wrap: wrap;
     align-items: center;
     margin-bottom: 16px;
+    border-radius: 8px;
 }
 
 .quantize-controls {
     align-items: center;
+    background-color: var(--brown);
+    border-radius: 8px;
 }
 
 .quantize-controls .btn.is-active {
     border-color: var(--border-strong);
     background: rgba(148, 163, 184, 0.12);
+}
+
+.quantize-controls .btn {
+    color: var(--text-muted);
+    color: var(--text-muted);
+    /* width: min-content !important; */
+    padding: 12px 4px;
+}
+
+.quantize-controls .btn.is-active {
+    color: var(--text);
+    background-color: var(brown-light);
 }
 
 .quantize-field {
@@ -661,11 +682,21 @@ textarea:focus-visible {
     min-width: 44px;
     width: 44px;
     height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+.quantize-select.is-disabled .quantizeToggle {
+    color: var(--red);
 }
 
 .quantize-select.is-disabled .quantize-select__toggle {
     cursor: not-allowed;
     opacity: 0.6;
+}
+
+.quantize-select.is-open .quantizeToggle {
+    color: white;
 }
 
 .quantize-select.is-open .quantize-select__toggle {
@@ -674,15 +705,15 @@ textarea:focus-visible {
 }
 
 .quantize-select__toggle {
-    width: 100%;
-    height: 100%;
+    width: 90%;
+    height: 90%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
     background: var(--brown);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     color: var(--text);
     cursor: pointer;
     transition: border-color var(--transition), background var(--transition), color var(--transition);
@@ -767,7 +798,8 @@ textarea:focus-visible {
 .quantize-select__option:focus,
 .quantize-select__option:focus-visible {
     outline: none;
-    background: rgba(148, 163, 184, 0.2);
+    /* background: rgba(148, 163, 184, 0.2); */
+    background: var(brown-light);
 }
 
 .quantize-select__option-icon {
@@ -815,6 +847,7 @@ textarea:focus-visible {
     .recording-secondary {
         flex-direction: column;
         align-items: stretch;
+        
     }
 
     .recording-secondary input {

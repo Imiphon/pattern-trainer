@@ -1457,7 +1457,7 @@ function updateQuantizationControls() {
     isQuantizationEnabled = false;
   }
   quantizeToggleBtn.disabled = !hasEvents;
-  quantizeToggleBtn.textContent = `Quantisierung: ${isQuantizationEnabled ? "An" : "Aus"}`;
+  quantizeToggleBtn.textContent = "Raster";
   quantizeToggleBtn.setAttribute("aria-pressed", isQuantizationEnabled ? "true" : "false");
   quantizeToggleBtn.classList.toggle("is-active", isQuantizationEnabled);
   const shouldDisableSelector = !hasEvents;
