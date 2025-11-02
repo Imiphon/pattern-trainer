@@ -1,0 +1,321 @@
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 20px 28px;
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(18px);
+  background: rgba(15, 23, 42, 0.8);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+
+.logo img {
+  width: 56px;
+  height: 56px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: 0.02em;
+}
+
+.menu-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.menu-btn:hover,
+.menu-btn:focus-visible {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: var(--border-strong);
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 32px 60px;
+}
+
+.orientation-hint {
+  display: none;
+  margin: 16px auto 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  max-width: 680px;
+}
+
+.panel-grid {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "instructions practice templates"
+    ". . metronome";
+}
+
+.panel {
+  max-height: 400px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color var(--transition), transform var(--transition);
+}
+
+.panel:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.panel--instructions {
+  grid-area: instructions;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.panel--templates {
+  grid-area: templates;
+  height: 240px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.panel--practice {
+  grid-area: practice;
+  height: 400px;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.panel--metronome {
+  grid-area: metronome;
+  height: 200px;
+  max-height: 200px;
+  overflow: hidden;
+  padding: 16px;
+  gap: 12px;
+  height: min-content;
+}
+
+.panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.panel-header--practice {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-frame {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding-right: 8px;
+}
+
+.header-frame button {
+  background-color: var(--red) !important;
+  border-radius: 8px;
+}
+
+.panel-header__actions--practice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.panel-header--practice .playback-controls {
+  margin-bottom: 0;
+}
+
+.panel-header--practice .btn.small {
+  line-height: 1.1;
+}
+
+.panel-header--metronome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-direction: row;
+}
+
+.panel-header--metronome .panel-header__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.panel-header--metronome .btn {
+  flex-shrink: 0;
+}
+
+.panel-header--metronome .btn.is-running {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.panel-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.panel-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel--instructions,
+.panel--templates,
+.panel--practice,
+.panel--metronome {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel--instructions .panel-content,
+.panel--templates .panel-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.panel--practice .panel-content,
+.panel--metronome .panel-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.app-footer {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.keyboard-area {
+  margin-top: 40px;
+}
+
+@media (max-width: 960px) {
+  .panel-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "instructions"
+      "practice"
+      "templates"
+      "metronome";
+  }
+
+  .panel--instructions,
+  .panel--templates,
+  .panel--practice,
+  .panel--metronome {
+    height: auto;
+    max-height: none;
+  }
+
+  .panel--instructions,
+  .panel--templates {
+    overflow: visible;
+  }
+
+  .orientation-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 16px 20px;
+  }
+
+  .menu-btn {
+    display: none;
+  }
+
+  .app-main {
+    padding: 28px 20px 40px;
+  }
+
+  .panel {
+    padding: 24px;
+  }
+
+  .keyboard-area {
+    margin-top: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-grid {
+    gap: 20px;
+  }
+
+  .panel {
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .cta-row {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .recording-primary,
+  .recording-secondary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recording-secondary input {
+    width: 100%;
+  }
+
+  .key.black {
+    right: -24%;
+  }
+}

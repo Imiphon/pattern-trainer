@@ -1,252 +1,13 @@
-:root {
-    color-scheme: dark;
-    --bg: #0f1729;
-    --bg-panel: #5d87d5d1;
-    --bg-panel-strong: #364b75eb;
-    --border: rgba(148, 163, 184, 0.25);
-    --border-strong: rgba(148, 163, 184, 0.45);
-    --text: #e2e8f0;
-    --text-muted: rgba(226, 232, 240, 0.72);
-    --accent: #facc15;
-    --accent-strong: #f59e0b;
-    --primary: #4a97de;
-    --danger: #f87171;
-    --red:#d33030;
-    --shadow-lg: 0 24px 80px rgba(15, 23, 42, 0.6);
-    --transition: 140ms ease;
-    font-family: "Inter", "Avenir", "Segoe UI", sans-serif;
-}
-
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-}
-
-body {
+.instruction-list {
     margin: 0;
-    min-height: 100vh;
-    background: radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 60%), var(--bg);
-    color: var(--text);
-}
-
-h2{
-    margin-left: 8px !important;
-}
-
-.app-shell {
-    min-height: 100vh;
+    padding-left: 20px;
     display: flex;
     flex-direction: column;
-}
-
-.app-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    padding: 20px 28px;
-    position: sticky;
-    top: 0;
-    backdrop-filter: blur(18px);
-    background: rgba(15, 23, 42, 0.8);
-    border-bottom: 1px solid var(--border);
-    z-index: 10;
-}
-
-.logo img {
-    width: 56px;
-    height: 56px;
-}
-
-.title {
-    margin: 0;
-    font-size: 1.75rem;
-    letter-spacing: 0.02em;
-}
-
-.menu-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 8px 14px;
-    color: var(--text);
-    font-size: 20px;
-    cursor: pointer;
-    transition: background var(--transition), border-color var(--transition);
-}
-
-.menu-btn:hover,
-.menu-btn:focus-visible {
-    background: rgba(148, 163, 184, 0.12);
-    border-color: var(--border-strong);
-}
-
-.app-main {
-    flex: 1;
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 40px 32px 60px;
-}
-
-.orientation-hint {
-    display: none;
-    margin: 16px auto 0;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    max-width: 680px;
-}
-
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-.panel-grid {
-    display: grid;
-    gap: 28px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas:
-        "instructions practice templates"
-        ". . metronome";
-}
-
-.panel--instructions {
-    grid-area: instructions;
-    max-height: 400px;
-    overflow: hidden;
-}
-
-.panel--templates {
-    grid-area: templates;
-    height: 240px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.panel--practice {
-    grid-area: practice;
-    height: 400px;
-    max-height: 400px;
-    overflow: auto;
-}
-
-.panel--metronome {
-    grid-area: metronome;
-    height: 200px;
-    max-height: 200px;
-    overflow: hidden;
-    padding: 16px;
     gap: 12px;
 }
 
-.panel {
-    max-height: 400px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    box-shadow: var(--shadow-lg);
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    transition: border-color var(--transition), transform var(--transition);
-}
-
-.panel:hover {
-    border-color: var(--border-strong);
-    transform: translateY(-2px);
-}
-
-.panel-header {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.panel-header h2 {
-    margin: 0;
-    font-size: 1.35rem;
-}
-
-.panel-header--practice {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.header-frame{
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    padding-right: 8px;
-}
-.header-frame button {
-background-color: var(--red) !important;
-border-radius: 8px;
-}
-
-.panel-header__actions--practice {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    margin-left: auto;
-}
-
-.panel-header--practice .playback-controls {
-    margin-bottom: 0;
-}
-
-.panel-header--practice .btn.small {
-    line-height: 1.1;
-}
-
-.panel-subtitle {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.95rem;
-}
-
-.panel-content {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.panel--instructions,
-.panel--templates,
-.panel--practice,
-.panel--metronome {
-    display: flex;
-    flex-direction: column;
-}
-
-.panel--instructions .panel-content,
-.panel--templates .panel-content {
-    flex: 1;
-    overflow: auto;
-}
-
-.panel--practice .panel-content,
-.panel--metronome .panel-content {
-    flex: 1;
-    overflow: auto;
-}
-
-.panel--metronome {
-    height: min-content;
+.instruction-list li {
+    line-height: 1.6;
 }
 
 .field {
@@ -287,18 +48,6 @@ select:focus-visible {
     box-shadow: 0 0 0 3px rgba(74, 151, 222, 0.25);
 }
 
-.instruction-list {
-    margin: 0;
-    padding-left: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.instruction-list li {
-    line-height: 1.6;
-}
-
 .cta-row {
     height: min-content;
     display: flex;
@@ -310,32 +59,11 @@ select:focus-visible {
 
 .btn {
     font: inherit;
-    border-radius: 25px;
+    border-radius: 8px;
     padding: 10px 18px;
     cursor: pointer;
     border: 1px solid transparent;
     transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition);
-    position: relative;
-    overflow: hidden;
-}
-
-.btn::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.12);
-    opacity: 0;
-    transition: opacity var(--transition);
-    pointer-events: none;
-}
-
-.btn:hover::after,
-.btn:focus-visible::after,
-.panel-header--practice .btn.small:hover::after,
-.panel-header--practice .btn.small:focus-visible::after,
-.template-card__actions .btn:hover::after,
-.template-card__actions .btn:focus-visible::after {
-    opacity: 1;
 }
 
 .btn.primary {
@@ -381,10 +109,6 @@ select:focus-visible {
     border-color: var(--red);
 }
 
-.btn.danger::after {
-    content: none;
-}
-
 /* .btn.danger:hover,
 .btn.danger:focus-visible {
     border-color: var(--red);
@@ -406,6 +130,30 @@ select:focus-visible {
 .btn.small {
     padding: 6px 12px;
     font-size: 0.85rem;
+}
+
+.btn,
+.template-card__icon-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::after,
+.template-card__icon-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.14);
+    opacity: 0;
+    transition: opacity var(--transition);
+    pointer-events: none;
+}
+
+.btn:hover::after,
+.btn:focus-visible::after,
+.template-card__icon-btn:hover::after,
+.template-card__icon-btn:focus-visible::after {
+    opacity: 1;
 }
 
 .template-grid {
@@ -476,9 +224,7 @@ select:focus-visible {
     transition: border-color var(--transition), background var(--transition), color var(--transition);
 }
 
-.template-card__icon-btn::after {
-    content: none;
-}
+
 
 .template-card__icon-btn--delete {
     border-radius: 8px;
@@ -486,8 +232,6 @@ select:focus-visible {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    position: relative;
-    overflow: hidden;
 }
 
 .template-card__icon-btn--delete img {
@@ -495,27 +239,6 @@ select:focus-visible {
     height: 60%;
     object-fit: contain;
 }
-
-.template-card__icon-btn--delete::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.18);
-    opacity: 0;
-    transition: opacity var(--transition);
-    pointer-events: none;
-}
-
-.template-card__icon-btn--delete:hover::after,
-.template-card__icon-btn--delete:focus-visible::after {
-    opacity: 1;
-}
-
-.template-card__icon-btn--delete:hover img,
-.template-card__icon-btn--delete:focus-visible img {
-    opacity: 0.82;
-}
-
 
 .template-card.is-dragging {
     opacity: 0.6;
@@ -572,43 +295,6 @@ textarea:focus-visible {
     outline: none;
     border-color: var(--border-strong);
     box-shadow: 0 0 0 3px rgba(74, 151, 222, 0.25);
-}
-
-.app-footer {
-    padding: 24px;
-    text-align: center;
-    color: var(--text-muted);
-    border-top: 1px solid var(--border);
-    background: rgba(15, 23, 42, 0.85);
-}
-
-.keyboard-area {
-    margin-top: 40px;
-}
-
-.panel-header--metronome {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-direction: row;
-}
-
-.panel-header--metronome .panel-header__info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-}
-
-.panel-header--metronome .btn {
-    flex-shrink: 0;
-}
-
-.panel-header--metronome .btn.is-running {
-    background: rgba(248, 113, 113, 0.15);
-    border-color: var(--red);
-    color: var(--red);
 }
 
 .metronome-content {
@@ -926,79 +612,13 @@ textarea:focus-visible {
     color: var(--text-muted);
 }
 
-@media (max-width: 960px) {
-    .panel-grid {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-            "instructions"
-            "practice"
-            "templates"
-            "metronome";
-    }
-
-    .panel--instructions,
-    .panel--templates,
-    .panel--practice,
-    .panel--metronome {
-        height: auto;
-        max-height: none;
-    }
-
-    .panel--instructions,
-    .panel--templates {
-        overflow: visible;
-    }
-
-    .orientation-hint {
-        display: block;
-    }
-}
-
 @media (max-width: 768px) {
-    .app-header {
-        padding: 16px 20px;
-    }
-
-    .menu-btn {
-        display: none;
-    }
-
-    .app-main {
-        padding: 28px 20px 40px;
-    }
-
-    .panel {
-        padding: 24px;
-    }
-
     .keyboard {
         height: 180px;
     }
 }
 
 @media (max-width: 480px) {
-    .panel-grid {
-        gap: 20px;
-    }
-
-    .panel {
-        gap: 16px;
-        padding: 20px;
-    }
-
-    .cta-row {
-        flex-direction: column;
-    }
-
-    .btn {
-        width: 100%;
-        text-align: center;
-    }
-
-    .keyboard-area {
-        margin-top: 28px;
-    }
-
     .recording-primary,
     .recording-secondary {
         flex-direction: column;
