@@ -26,46 +26,56 @@
                 <article class="panel panel--instructions" aria-labelledby="panel-instructions">
                     <header class="panel-header">
                         <h2 id="panel-instructions">Anweisungen</h2>
-                        <p class="panel-subtitle">So nutzt du den Pattern Trainer.</p>
+                        <!-- <p class="panel-subtitle">So nutzt du den Pattern Trainer.</p> -->
                     </header>
                     <div class="panel-content">
                         <ol class="instruction-list">
-                            <li>Hoere dir ein Pattern an oder lies die Vorlage im naechsten Fenster.</li>
-                            <li>Analysiere Intervalle und Rhythmus. Notiere markante Merkmale.</li>
-                            <li>Spiele oder singe das Pattern nach und notiere deine Loesung unter "Meine Uebung".</li>
+                            <li>Spiele ein neues Pattern ein, indem du Tempo und Takt einstellst, Aufnahme, Stopp und Vorlage speichern klickst. Oder greife auf die vorandenen zu.</li>
+                            <li>Höre dir die Vorlage(n) an, ziehe sie in "Meine Übung" und ordne sie beliebig.</li>
+                            <li>Bestimme, wie oft du es hintereinander(!) richtig spielen willst, das tempo und die Länge der Pausen zwischen den Wiederholungen.</li>
+                            <li>Klicke "Play" in "Meine Übung" und spiele die Vorlage(n) mit oder ohne Playback.</li>                            
                         </ol>
                     </div>
                 </article>
 
                 <article class="panel panel--practice" aria-labelledby="panel-practice">
-                    <header class="panel-header">
-                        <h2 id="panel-practice">Meine Uebung</h2>
-                        <div class="playback-controls">
-                            <label class="volume-control">
-                                <span class="field-label">Playback Vol.</span>
-                                <input id="playbackVolume" type="range" min="0" max="100" value="80" />
-                            </label>
-                            <label class="toggle-control">
-                                <span class="field-label">Metronom</span>
-                                <input id="playbackMetronomeToggle" type="checkbox" checked />
-                            </label>
+                    <header class="panel-header panel-header--practice">
+                        <div class="header-frame">
+                            <h2 id="panel-practice">Meine Uebung</h2>
+                        <button id="practiceQueueClear" class="btn ghost small" type="button" disabled>Neu</button>
+                        </div>
+                        <div class="panel-header__actions panel-header__actions--practice">
+                            <div class="playback-controls">
+                                <label class="volume-control">
+                                    <span class="field-label">Playback Vol.</span>
+                                    <input id="playbackVolume" type="range" min="0" max="100" value="80" />
+                                </label>
+                                <label class="toggle-control">
+                                    <span class="field-label">Metronom</span>
+                                    <input id="playbackMetronomeToggle" type="checkbox" checked />
+                                </label>
+                            </div>
                         </div>
                     </header>
                     <div class="panel-content practice-content">
                         <section id="practiceDropZone" class="recording-summary" aria-live="polite">
-                            <p id="practiceHint" class="practice-hint">Klicke eine oder mehrere Vorlagen an, um sie in beliebiger Reihenfolge zu üben.</p>
+                            <p id="practiceHint" class="practice-hint">Zieh hier die Vorlagen rein, um sie in beliebiger Reihenfolge zu üben.</p>
                             <ul id="practiceQueue" class="practice-queue" aria-label="Ausgewählte Vorlagen"></ul>
                             <div id="recordingSummaryNotation" class="recording-notation">Noch keine Aufnahme.</div>
                         </section>
 
                         <div class="cta-row">
                             <label class="rep-control">
-                                <span class="field-label">Rep</span>
+                                <span class="field-label">Rounds</span>
                                 <select id="practiceRepeats">
                                     <option value="1" selected>1</option>
                                     <option value="2">2</option>
                                     <option value="3">3</option>
                                     <option value="4">4</option>
+                                    <option value="4">5</option>
+                                    <option value="4">6</option>
+                                    <option value="4">7</option>
+                                    <option value="4">8</option>
                                 </select>
                             </label>
                             <label class="rep-control">
@@ -78,7 +88,6 @@
                                 </select>
                             </label>
                             <button id="practiceQueuePlay" class="btn accent" type="button" disabled>▶</button>
-                            <button id="practiceQueueClear" class="btn ghost" type="button" disabled>Neu</button>
                         </div>
                     </div>
                 </article>

@@ -1,8 +1,8 @@
 :root {
     color-scheme: dark;
     --bg: #0f1729;
-    --bg-panel: rgba(17, 25, 40, 0.82);
-    --bg-panel-strong: rgba(27, 38, 60, 0.92);
+    --bg-panel: #5d87d5d1;
+    --bg-panel-strong: #364b75eb;
     --border: rgba(148, 163, 184, 0.25);
     --border-strong: rgba(148, 163, 184, 0.45);
     --text: #e2e8f0;
@@ -27,6 +27,10 @@ body {
     min-height: 100vh;
     background: radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 60%), var(--bg);
     color: var(--text);
+}
+
+h2{
+    margin-left: 8px !important;
 }
 
 .app-shell {
@@ -144,7 +148,7 @@ body {
 }
 
 .panel {
-        max-height: 400px;
+    max-height: 400px;
     background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: 24px;
@@ -169,6 +173,42 @@ body {
 .panel-header h2 {
     margin: 0;
     font-size: 1.35rem;
+}
+
+.panel-header--practice {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.header-frame{
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding-right: 8px;
+}
+.header-frame button {
+background-color: #d33030 !important;
+border-radius: 8px;
+}
+
+.panel-header__actions--practice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+.panel-header--practice .playback-controls {
+    margin-bottom: 0;
+}
+
+.panel-header--practice .btn.small {
+    line-height: 1.1;
 }
 
 .panel-subtitle {
@@ -297,7 +337,7 @@ select:focus-visible {
 }
 
 #practiceQueuePlay {
-        padding: 0px 15px;
+    padding: 0px 15px;
     border-radius: 25%;
     height: 36px;
 }
@@ -352,7 +392,7 @@ select:focus-visible {
     background: var(--bg-panel-strong);
     border: 1px solid var(--border);
     border-radius: 18px;
-    padding: 18px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -366,7 +406,7 @@ select:focus-visible {
 .template-card:focus-visible {
     border-color: var(--border-strong);
     transform: translateY(-2px);
-    background: rgba(27, 38, 60, 0.96);
+    background: rgba(114, 161, 255, 0.96);
 }
 
 .template-name {
@@ -394,13 +434,18 @@ select:focus-visible {
 }
 
 .template-card__icon-btn {
-    background: transparent;
+    background-color: #55a14d;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: 8px;
     color: var(--text);
     font-size: 0.85rem;
     line-height: 1;
-    padding: 4px 10px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: border-color var(--transition), background var(--transition), color var(--transition);
 }
@@ -412,8 +457,17 @@ select:focus-visible {
 }
 
 .template-card__icon-btn--delete {
-    color: var(--danger);
-    border-color: rgba(248, 113, 113, 0.6);
+    border-radius: 8px;
+    background-color: #d33030;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.template-card__icon-btn--delete img {
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
 }
 
 .template-card__icon-btn--delete:hover,
@@ -421,6 +475,7 @@ select:focus-visible {
     border-color: rgba(248, 113, 113, 0.8);
     background: rgba(248, 113, 113, 0.15);
 }
+
 
 .template-card.is-dragging {
     opacity: 0.6;
@@ -566,7 +621,7 @@ textarea:focus-visible {
     align-items: center;
     gap: 16px;
     margin-bottom: 12px;
-    flex-wrap: row;
+    flex-wrap: wrap;
 }
 
 .toggle-control {

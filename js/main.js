@@ -60,6 +60,7 @@ const QUEUE_DRAG_KEY = "application/x-practice-queue-index";
 let keyboardGainNode = null;
 let playbackGainNode = null;
 let metronomeStartedForPlayback = false;
+let metronomeStartedForCountIn = false;
 let keyboardVolumeValue = sliderValueToGain(keyboardVolumeSlider?.value ?? 90);
 let playbackVolumeValue = sliderValueToGain(playbackVolumeSlider?.value ?? 80);
 let metronomeVolumeValue = sliderValueToGain(metronomeVolumeSlider?.value ?? 80);
@@ -444,10 +445,11 @@ function stopMetronomeIfNeeded() {
 }
 
 function stopMetronomeAfterPlayback() {
-  if (metronomeStartedForPlayback && metronomeInstance?.isActive()) {
+  if ((metronomeStartedForPlayback || metronomeStartedForCountIn) && metronomeInstance?.isActive()) {
     metronomeInstance.stop();
   }
   metronomeStartedForPlayback = false;
+  metronomeStartedForCountIn = false;
 }
 
 function generateTemplateName() {
@@ -615,7 +617,12 @@ function playPracticeQueue() {
   }
 
   const syncWithMetronome = playbackMetronomeToggle ? playbackMetronomeToggle.checked : false;
-  playDynamicSequence(aggregatedEvents, "Übungs-Queue spielt ab ...", { syncWithMetronome });
+  const countInBeats = Math.max(1, beatsPerBar);
+  playDynamicSequence(aggregatedEvents, "Übungs-Queue spielt ab ...", {
+    syncWithMetronome,
+    countInBeats,
+    baseBeatLength
+  });
 }
 
 async function playDynamicSequence(events, statusMessage, options = {}) {
@@ -628,13 +635,24 @@ async function playDynamicSequence(events, statusMessage, options = {}) {
   playBtn.disabled = true;
   updatePracticeQueueControls();
 
-  const shouldSyncWithMetronome = options.syncWithMetronome ?? (playbackMetronomeToggle ? playbackMetronomeToggle.checked : false);
+  const shouldSyncWithMetronome =
+    options.syncWithMetronome ?? (playbackMetronomeToggle ? playbackMetronomeToggle.checked : false);
+  const providedBeatLength = options.baseBeatLength;
+  const baseBeatLength =
+    Number.isFinite(providedBeatLength) && providedBeatLength > 0 ? providedBeatLength : getQueueBeatLength(events);
+  const countInBeats = Math.max(0, options.countInBeats ?? 0);
+
   let tempoScale = 1;
-  const baseBeatLength = getQueueBeatLength(events);
+  const metronomeBeatLength =
+    metronomeInstance && Number.isFinite(metronomeInstance.bpm) && metronomeInstance.bpm > 0
+      ? 60 / metronomeInstance.bpm
+      : null;
+
+  metronomeStartedForCountIn = false;
 
   if (shouldSyncWithMetronome && metronomeInstance) {
-    const currentBeatLength = 60 / metronomeInstance.bpm;
-    tempoScale = currentBeatLength / baseBeatLength;
+    const currentBeatLength = metronomeBeatLength ?? 60 / metronomeInstance.bpm;
+    tempoScale = currentBeatLength / Math.max(baseBeatLength, 0.001);
     if (!metronomeInstance.isActive()) {
       await metronomeInstance.start();
       metronomeStartedForPlayback = metronomeInstance.isActive();
@@ -643,9 +661,29 @@ async function playDynamicSequence(events, statusMessage, options = {}) {
     }
   } else {
     metronomeStartedForPlayback = false;
+    if (countInBeats > 0 && metronomeInstance && !metronomeInstance.isActive()) {
+      await metronomeInstance.start();
+      metronomeStartedForCountIn = metronomeInstance.isActive();
+    }
   }
 
-  const startAt = ctx.currentTime + 0.1;
+  const fallbackBeatLength = baseBeatLength > 0 ? baseBeatLength : DEFAULT_NOTE_DURATION;
+  const resolvedCountInBeatLength = countInBeats > 0 ? metronomeBeatLength ?? fallbackBeatLength : 0;
+  const countInDuration = resolvedCountInBeatLength > 0 ? countInBeats * resolvedCountInBeatLength : 0;
+
+  if (metronomeStartedForCountIn && countInDuration > 0) {
+    const stopDelay = countInDuration * 1000 + 150;
+    const stopId = window.setTimeout(() => {
+      if (metronomeInstance?.isActive()) {
+        metronomeInstance.stop();
+      }
+      metronomeStartedForCountIn = false;
+    }, stopDelay);
+    playbackTimeouts.push(stopId);
+  }
+
+  const startDelay = 0.1 + countInDuration;
+  const startAt = ctx.currentTime + startDelay;
   let totalDuration = 0;
 
   events.forEach((event) => {
@@ -655,11 +693,12 @@ async function playDynamicSequence(events, statusMessage, options = {}) {
     scheduleTone(ctx, event.note, scaledStart, scaledDuration, playbackGainNode ?? ctx.destination);
   });
 
+  const overallDuration = totalDuration + startDelay;
   playbackTimeouts.push(
     window.setTimeout(() => {
       stopPlayback();
       updateRecordingStatus("Wiedergabe beendet.");
-    }, totalDuration * 1000 + 200)
+    }, overallDuration * 1000 + 200)
   );
 
   updateRecordingStatus(statusMessage ?? "Wiedergabe läuft ...");
@@ -1070,7 +1109,7 @@ function renderTemplates() {
     deleteBtn.type = "button";
     deleteBtn.className = "template-card__icon-btn template-card__icon-btn--delete";
     deleteBtn.setAttribute("aria-label", `Vorlage ${template.name} löschen`);
-    deleteBtn.textContent = "🗑";
+    deleteBtn.innerHTML = '<img src="./assets/images/trash-white32.png" alt="Melopoiia Logo" />';
     deleteBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       handleTemplateDelete(template.id);
