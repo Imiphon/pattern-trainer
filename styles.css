@@ -11,6 +11,7 @@
     --accent-strong: #f59e0b;
     --primary: #4a97de;
     --danger: #f87171;
+    --red:#d33030;
     --shadow-lg: 0 24px 80px rgba(15, 23, 42, 0.6);
     --transition: 140ms ease;
     font-family: "Inter", "Avenir", "Segoe UI", sans-serif;
@@ -190,7 +191,7 @@ h2{
     padding-right: 8px;
 }
 .header-frame button {
-background-color: #d33030 !important;
+background-color: var(--red) !important;
 border-radius: 8px;
 }
 
@@ -309,11 +310,32 @@ select:focus-visible {
 
 .btn {
     font: inherit;
-    border-radius: 999px;
+    border-radius: 25px;
     padding: 10px 18px;
     cursor: pointer;
     border: 1px solid transparent;
     transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    opacity: 0;
+    transition: opacity var(--transition);
+    pointer-events: none;
+}
+
+.btn:hover::after,
+.btn:focus-visible::after,
+.panel-header--practice .btn.small:hover::after,
+.panel-header--practice .btn.small:focus-visible::after,
+.template-card__actions .btn:hover::after,
+.template-card__actions .btn:focus-visible::after {
+    opacity: 1;
 }
 
 .btn.primary {
@@ -354,16 +376,20 @@ select:focus-visible {
 }
 
 .btn.danger {
-    background: transparent;
-    color: var(--danger);
-    border-color: rgba(248, 113, 113, 0.6);
+    background: var(--red);
+    color: white;
+    border-color: var(--red);
 }
 
-.btn.danger:hover,
-.btn.danger:focus-visible {
-    border-color: rgba(248, 113, 113, 0.85);
-    background: rgba(248, 113, 113, 0.12);
+.btn.danger::after {
+    content: none;
 }
+
+/* .btn.danger:hover,
+.btn.danger:focus-visible {
+    border-color: var(--red);
+    background: rgba(248, 113, 113, 0.631);
+} */
 
 .btn.ghost {
     background: transparent;
@@ -450,18 +476,18 @@ select:focus-visible {
     transition: border-color var(--transition), background var(--transition), color var(--transition);
 }
 
-.template-card__icon-btn:hover,
-.template-card__icon-btn:focus-visible {
-    border-color: var(--border-strong);
-    background: rgba(148, 163, 184, 0.14);
+.template-card__icon-btn::after {
+    content: none;
 }
 
 .template-card__icon-btn--delete {
     border-radius: 8px;
-    background-color: #d33030;
+    background-color: var(--red);
     display: inline-flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+    overflow: hidden;
 }
 
 .template-card__icon-btn--delete img {
@@ -470,10 +496,24 @@ select:focus-visible {
     object-fit: contain;
 }
 
-.template-card__icon-btn--delete:hover,
-.template-card__icon-btn--delete:focus-visible {
-    border-color: rgba(248, 113, 113, 0.8);
-    background: rgba(248, 113, 113, 0.15);
+.template-card__icon-btn--delete::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.18);
+    opacity: 0;
+    transition: opacity var(--transition);
+    pointer-events: none;
+}
+
+.template-card__icon-btn--delete:hover::after,
+.template-card__icon-btn--delete:focus-visible::after {
+    opacity: 1;
+}
+
+.template-card__icon-btn--delete:hover img,
+.template-card__icon-btn--delete:focus-visible img {
+    opacity: 0.82;
 }
 
 
@@ -567,8 +607,8 @@ textarea:focus-visible {
 
 .panel-header--metronome .btn.is-running {
     background: rgba(248, 113, 113, 0.15);
-    border-color: rgba(248, 113, 113, 0.8);
-    color: var(--danger);
+    border-color: var(--red);
+    color: var(--red);
 }
 
 .metronome-content {
@@ -709,13 +749,13 @@ textarea:focus-visible {
 }
 
 .practice-queue__btn--remove {
-    color: var(--danger);
-    border-color: rgba(248, 113, 113, 0.6);
+    color: var(--red);
+    border-color: var(--red);
 }
 
 .practice-queue__btn--remove:hover,
 .practice-queue__btn--remove:focus-visible {
-    border-color: rgba(248, 113, 113, 0.8);
+    border-color: var(--red);
     background: rgba(248, 113, 113, 0.12);
 }
 
