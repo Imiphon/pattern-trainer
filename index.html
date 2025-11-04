@@ -166,6 +166,28 @@
                                 </span>
                                 <span class="sr-only">Stopp</span>
                             </button>
+                            <div class="recording-secondary quantize-controls" data-quantize-select>
+                                <button
+                                    id="quantizeToggle"
+                                    class="btn ghost btn-icon-only quantize-toggle"
+                                    type="button"
+                                    disabled
+                                    aria-haspopup="listbox"
+                                    aria-expanded="false"
+                                    aria-controls="quantizeModeList"
+                                >
+                                    <span class="quantize-toggle__label" aria-hidden="true">Q</span>
+                                    <span class="sr-only">Quantisierung auswählen</span>
+                                </button>
+                                <ul
+                                    id="quantizeModeList"
+                                    class="quantize-select__list"
+                                    role="listbox"
+                                    aria-hidden="true"
+                                    aria-labelledby="quantizeToggle"
+                                ></ul>
+                                <input type="hidden" id="quantizeMode" value="none" />
+                            </div>
                             <button id="playBtn" class="btn primary btn-icon-only" type="button" disabled aria-label="Abspielen">
                                 <span class="btn-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" focusable="false">
@@ -184,35 +206,6 @@
                                 <span class="sr-only">Loeschen</span>
                             </button>
                         </div>
-                        <div class="recording-secondary quantize-controls">
-                            <button id="quantizeToggle" class="btn quantize" type="button" disabled>Raster</button>
-                            <label class="field quantize-field">
-                                <!-- <span class="field-label">Raster</span> -->
-                                <div class="quantize-select is-disabled" data-quantize-select>
-                                    <button
-                                        id="quantizeModeToggle"
-                                        class="quantize-select__toggle"
-                                        type="button"
-                                        disabled
-                                        aria-haspopup="listbox"
-                                        aria-expanded="false"
-                                        aria-controls="quantizeModeList"
-                                    >
-                                        <span class="quantize-select__icon" aria-hidden="true">
-                                            <img src="./assets/images/notes/1-4.png" alt="">
-                                        </span>
-                                        <!-- <span class="quantize-select__label">Viertel</span> -->
-                                        <span class="quantize-select__chevron" aria-hidden="true">
-                                            <svg viewBox="0 0 12 8" focusable="false">
-                                                <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                            </svg>
-                                        </span>
-                                    </button>
-                                    <ul id="quantizeModeList" class="quantize-select__list" role="listbox" aria-hidden="true" aria-labelledby="quantizeModeToggle"></ul>
-                                    <input type="hidden" id="quantizeMode" value="quarter" />
-                                </div>
-                            </label>
-                        </div>
                     </div>
                     <div class="panel-content keyboard-content">
 
@@ -227,6 +220,37 @@
         <footer class="app-footer">
             <small>&copy; Melopoiia - Trainingsprototyp</small>
         </footer>
+    </div>
+
+    <div id="imageOverlayContainer" class="image-overlay-container" aria-live="polite"></div>
+
+    <div id="templateMediaModal" class="media-modal" aria-hidden="true">
+        <div class="media-modal__backdrop" data-media-modal-close></div>
+        <div class="media-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="mediaModalTitle"
+            tabindex="-1">
+            <header class="media-modal__header">
+                <h2 id="mediaModalTitle">Bild zur Vorlage hinzufügen</h2>
+                <button class="media-modal__close" type="button" aria-label="Fenster schließen"
+                    data-media-modal-close>&times;</button>
+            </header>
+            <div class="media-modal__body">
+                <section class="media-modal__section media-modal__section--preview">
+                    <h3 class="media-modal__section-title">Vorschau</h3>
+                    <div id="mediaModalPreview" class="media-modal__preview" aria-live="polite"></div>
+                </section>
+                <section class="media-modal__section media-modal__section--upload">
+                    <h3 class="media-modal__section-title">Eigene Datei hochladen</h3>
+                    <label class="media-modal__file-label" for="mediaModalFileInput">Bilddatei auswählen
+                        <input id="mediaModalFileInput" type="file" accept="image/*" />
+                    </label>
+                </section>
+            </div>
+            <footer class="media-modal__footer">
+                <button class="btn ghost small" type="button" data-media-modal-close>Abbrechen</button>
+                <button class="btn primary small" type="button" id="mediaModalSave" disabled>Bild speichern</button>
+                <button class="btn small" type="button" id="mediaModalShow" disabled>Overlay anzeigen</button>
+            </footer>
+        </div>
     </div>
 
     <script type="module" src="./js/main.js"></script>

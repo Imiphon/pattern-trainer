@@ -45,6 +45,13 @@ const practiceQueuePlayBtn = document.getElementById("practiceQueuePlay");
 const practiceQueueClearBtn = document.getElementById("practiceQueueClear");
 const practiceRepeatsSelect = document.getElementById("practiceRepeats");
 const practicePauseBarsSelect = document.getElementById("practicePauseBars");
+const mediaModal = document.getElementById("templateMediaModal");
+const mediaModalDialog = mediaModal?.querySelector(".media-modal__dialog");
+const mediaModalFileInput = document.getElementById("mediaModalFileInput");
+const mediaModalPreview = document.getElementById("mediaModalPreview");
+const mediaModalSaveBtn = document.getElementById("mediaModalSave");
+const mediaModalShowBtn = document.getElementById("mediaModalShow");
+const imageOverlayContainer = document.getElementById("imageOverlayContainer");
 
 const metronomeBpmInput = document.getElementById("metronomeBpm");
 const metronomeBeatsInput = document.getElementById("metronomeBeats");
@@ -69,13 +76,17 @@ const QUANTIZE_RESOLUTIONS = QUANTIZE_PRESETS.reduce((acc, preset) => {
   return acc;
 }, {});
 const DEFAULT_QUANTIZE_MODE = "quarter";
+const NO_QUANTIZE_VALUE = "none";
 const NOTE_TIME_EPSILON = 0.0001;
 const EXTRA_SUSTAIN_SECONDS = 0.1;
+const MEDIA_ICON_SRC = "./assets/images/add-file-black.png";
+const OVERLAY_ICON_SRC = "./assets/images/file-white.png";
+const DEFAULT_OVERLAY_POSITION = { x: 80, y: 80 };
+const OVERLAY_EDGE_PADDING = 16;
 const MAX_FORCED_SUSTAIN_RATIO = 2.5;
 const quantizeToggleBtn = document.getElementById("quantizeToggle");
 const quantizeModeSelect = document.getElementById("quantizeMode");
 const quantizeSelectWrapper = document.querySelector("[data-quantize-select]");
-const quantizeModeToggleBtn = document.getElementById("quantizeModeToggle");
 const quantizeModeList = document.getElementById("quantizeModeList");
 let quantizeOptionElements = [];
 const quantizeOptionData = new Map();
@@ -95,32 +106,64 @@ let isQuantizationEnabled = false;
 let lastQuantizeMode = DEFAULT_QUANTIZE_MODE;
 let isQuantizeMenuOpen = false;
 let quantizeFocusedOptionIndex = -1;
+let activeTemplateIdForMedia = null;
+let pendingMediaDataUrl = null;
+const activeImageOverlays = new Map();
+
+function createButtonIcon(src, className) {
+  const resolvedSrc = new URL(src, document.baseURI).href;
+  const img = document.createElement("img");
+  img.src = resolvedSrc;
+  img.alt = "";
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.draggable = false;
+  if (className) {
+    img.className = className;
+  }
+  img.setAttribute("role", "presentation");
+  img.addEventListener("error", () => {
+    console.warn(`Icon failed to load: ${resolvedSrc}`);
+  });
+  return img;
+}
 
 function renderQuantizeOptions() {
   if (!quantizeModeList) return;
   quantizeModeList.innerHTML = "";
+  quantizeOptionElements = [];
   quantizeOptionData.clear();
 
-  QUANTIZE_PRESETS.forEach(({ value, label, icon }, index) => {
+  const options = [
+    { value: NO_QUANTIZE_VALUE, label: "Quantisierung aus", icon: null },
+    ...QUANTIZE_PRESETS
+  ];
+
+  options.forEach(({ value, label, icon }, index) => {
     const option = document.createElement("li");
     option.className = "quantize-select__option";
     option.setAttribute("role", "option");
     option.dataset.value = value;
     option.dataset.label = label;
-    if (icon) {
-      option.dataset.icon = icon;
-    }
     option.setAttribute("tabindex", "-1");
     option.setAttribute("aria-selected", "false");
 
-  const iconWrapper = document.createElement("span");
-  iconWrapper.className = "quantize-select__option-icon";
-  iconWrapper.setAttribute("aria-hidden", "true");
-  const img = document.createElement("img");
-  img.src = icon;
-  img.alt = "";
-  iconWrapper.appendChild(img);
-  option.appendChild(iconWrapper);
+    if (icon) {
+      option.dataset.icon = icon;
+      const iconWrapper = document.createElement("span");
+      iconWrapper.className = "quantize-select__option-icon";
+      iconWrapper.setAttribute("aria-hidden", "true");
+      const img = document.createElement("img");
+      img.src = icon;
+      img.alt = "";
+      iconWrapper.appendChild(img);
+      option.appendChild(iconWrapper);
+    }
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "quantize-select__option-label";
+    labelSpan.textContent = label;
+    option.appendChild(labelSpan);
 
     quantizeModeList.appendChild(option);
     quantizeOptionData.set(value, { label, icon, index });
@@ -129,7 +172,7 @@ function renderQuantizeOptions() {
   quantizeOptionElements = Array.from(quantizeModeList.querySelectorAll(".quantize-select__option"));
   quantizeOptionElements.forEach((option, index) => {
     option.addEventListener("click", () => {
-      if (quantizeModeToggleBtn?.disabled) return;
+      if (quantizeToggleBtn?.disabled) return;
       const { value } = option.dataset;
       if (!value) return;
       selectQuantizeOption(value);
@@ -139,6 +182,25 @@ function renderQuantizeOptions() {
 }
 
 renderQuantizeOptions();
+if (mediaModalDialog && !mediaModalDialog.hasAttribute("tabindex")) {
+  mediaModalDialog.setAttribute("tabindex", "-1");
+}
+
+if (mediaModalSaveBtn) {
+  mediaModalSaveBtn.addEventListener("click", handleMediaModalSave);
+}
+
+if (mediaModalShowBtn) {
+  mediaModalShowBtn.addEventListener("click", handleMediaModalShow);
+}
+
+if (mediaModalFileInput) {
+  mediaModalFileInput.addEventListener("change", handleMediaFileInput);
+}
+
+if (mediaModal) {
+  mediaModal.addEventListener("click", handleMediaModalClick);
+}
 
 if (keyboardEl) {
   keyElements = createKeyboard(keyboardEl, triggerNotePlayback);
@@ -210,42 +272,40 @@ if (practicePauseBarsSelect) {
 }
 
 if (quantizeToggleBtn && quantizeModeSelect) {
-  quantizeToggleBtn.addEventListener("click", () => {
-    if (!recordedEvents.length) return;
-    isQuantizationEnabled = !isQuantizationEnabled;
-    updateQuantizationControls();
-    refreshQuantizationPreview();
-  });
-  quantizeModeSelect.addEventListener("change", () => {
-    const selectedValue = getSelectedQuantizeMode();
-    updateQuantizeToggleDisplay(selectedValue);
-    updateQuantizeOptionSelection(selectedValue);
-    if (recordedEvents.length && isQuantizationEnabled) {
-      refreshQuantizationPreview();
-    }
-  });
-}
-
-if (quantizeModeToggleBtn) {
-  quantizeModeToggleBtn.addEventListener("click", () => {
-    if (quantizeModeToggleBtn.disabled) return;
+  quantizeToggleBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (quantizeToggleBtn.disabled) return;
     if (isQuantizeMenuOpen) {
       closeQuantizeMenu(true);
     } else {
       openQuantizeMenu();
     }
   });
-  quantizeModeToggleBtn.addEventListener("keydown", handleQuantizeToggleKeydown);
+  quantizeToggleBtn.addEventListener("keydown", handleQuantizeToggleKeydown);
+  quantizeModeSelect.addEventListener("change", () => {
+    const selectedValue = quantizeModeSelect.value || NO_QUANTIZE_VALUE;
+    if (selectedValue !== NO_QUANTIZE_VALUE) {
+      lastQuantizeMode = selectedValue;
+    }
+    isQuantizationEnabled = selectedValue !== NO_QUANTIZE_VALUE;
+    updateQuantizeOptionSelection(selectedValue);
+    updateQuantizationControls();
+    if (recordedEvents.length && isQuantizationEnabled) {
+      refreshQuantizationPreview();
+    }
+  });
 }
 
 if (quantizeModeSelect) {
-  let initialValue = quantizeModeSelect.value || DEFAULT_QUANTIZE_MODE;
+  let initialValue = quantizeModeSelect.value || NO_QUANTIZE_VALUE;
   if (!quantizeOptionData.has(initialValue)) {
-    initialValue = quantizeOptionElements[0]?.dataset.value ?? DEFAULT_QUANTIZE_MODE;
+    initialValue = NO_QUANTIZE_VALUE;
     quantizeModeSelect.value = initialValue;
   }
   selectQuantizeOption(initialValue, { closeMenu: false, silent: true });
-  lastQuantizeMode = initialValue;
+  if (initialValue !== NO_QUANTIZE_VALUE) {
+    lastQuantizeMode = initialValue;
+  }
 }
 
 updateQuantizationControls();
@@ -685,6 +745,10 @@ function handleTemplateDelete(templateId) {
   if (!template) return;
   const confirmed = window.confirm(`Vorlage "${template.name}" wirklich löschen?`);
   if (!confirmed) return;
+  if (activeTemplateIdForMedia === templateId) {
+    closeTemplateMediaModal();
+  }
+  hideTemplateImageOverlay(templateId);
   savedTemplates = savedTemplates.filter((tpl) => tpl.id !== templateId);
   practiceQueue = practiceQueue.filter((entry) => entry.templateId !== templateId);
   renderTemplates();
@@ -1075,7 +1139,9 @@ function saveRecordingAsTemplate() {
     id: `user-${Date.now()}`,
     name,
     description: `Aufnahme ${savedTemplates.filter((tpl) => tpl.id.startsWith("user-")).length + 1}`,
-    events: sourceEvents.map((event) => ({ ...event }))
+    events: sourceEvents.map((event) => ({ ...event })),
+    overlayImage: null,
+    overlayPosition: { ...DEFAULT_OVERLAY_POSITION }
   };
 
   savedTemplates.push(template);
@@ -1212,10 +1278,19 @@ function estimateHighlightDuration(baseDurationSeconds, sustainDurationSeconds) 
 
 function getSelectedQuantizeMode() {
   if (!quantizeModeSelect) {
-    return QUANTIZE_RESOLUTIONS[lastQuantizeMode] ? lastQuantizeMode : DEFAULT_QUANTIZE_MODE;
+    return isQuantizationEnabled && QUANTIZE_RESOLUTIONS[lastQuantizeMode]
+      ? lastQuantizeMode
+      : NO_QUANTIZE_VALUE;
   }
-  const rawValue = quantizeModeSelect.value || lastQuantizeMode || DEFAULT_QUANTIZE_MODE;
-  const resolved = QUANTIZE_RESOLUTIONS[rawValue] ? rawValue : DEFAULT_QUANTIZE_MODE;
+  const rawValue = quantizeModeSelect.value || NO_QUANTIZE_VALUE;
+  if (rawValue === NO_QUANTIZE_VALUE) {
+    return NO_QUANTIZE_VALUE;
+  }
+  const resolved = QUANTIZE_RESOLUTIONS[rawValue]
+    ? rawValue
+    : QUANTIZE_RESOLUTIONS[lastQuantizeMode]
+      ? lastQuantizeMode
+      : DEFAULT_QUANTIZE_MODE;
   lastQuantizeMode = resolved;
   return resolved;
 }
@@ -1236,6 +1311,7 @@ function getRecordingBeatLengthSeconds() {
 }
 
 function getQuantizationGridSeconds(mode) {
+  if (!mode || mode === NO_QUANTIZE_VALUE) return null;
   const setting = QUANTIZE_RESOLUTIONS[mode];
   if (!setting) return null;
   const beatLength = getRecordingBeatLengthSeconds();
@@ -1287,27 +1363,17 @@ function getDisplayRecordingEvents() {
 }
 
 function updateQuantizeToggleDisplay(value) {
-  if (!quantizeModeToggleBtn) return;
-  const data =
-    quantizeOptionData.get(value) ||
-    (quantizeOptionElements.length ? quantizeOptionData.get(quantizeOptionElements[0].dataset.value) : null);
-  const labelEl = quantizeModeToggleBtn.querySelector(".quantize-select__label");
-  const iconImg = quantizeModeToggleBtn.querySelector(".quantize-select__icon img");
-  const label = data?.label ?? value ?? "";
+  if (!quantizeToggleBtn) return;
+  const data = quantizeOptionData.get(value);
+  const label = data?.label ?? "";
+  const labelEl = quantizeToggleBtn.querySelector(".quantize-toggle__label");
   if (labelEl) {
-    labelEl.textContent = label;
+    labelEl.textContent = "Q";
   }
-  if (iconImg) {
-    if (data?.icon) {
-      iconImg.src = data.icon;
-      iconImg.alt = label;
-      iconImg.style.visibility = "";
-    } else {
-      iconImg.src = "";
-      iconImg.alt = "";
-      iconImg.style.visibility = "hidden";
-    }
-  }
+  const description =
+    value === NO_QUANTIZE_VALUE ? "Quantisierung aus" : `Quantisierung: ${label}`;
+  quantizeToggleBtn.setAttribute("aria-label", description);
+  quantizeToggleBtn.title = description;
 }
 
 function updateQuantizeOptionSelection(value) {
@@ -1330,26 +1396,33 @@ function selectQuantizeOption(value, { closeMenu = true, focusToggle = true, sil
   if (!quantizeModeSelect || !quantizeOptionData.has(value)) return;
   const previousValue = quantizeModeSelect.value;
   quantizeModeSelect.value = value;
-  updateQuantizeToggleDisplay(value);
-  updateQuantizeOptionSelection(value);
-  if (closeMenu) {
-    closeQuantizeMenu(focusToggle);
-  }
   if (!silent && value !== previousValue) {
     quantizeModeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  } else if (silent) {
+    isQuantizationEnabled = value !== NO_QUANTIZE_VALUE;
+    if (isQuantizationEnabled && value !== NO_QUANTIZE_VALUE) {
+      lastQuantizeMode = value;
+    }
+    updateQuantizeOptionSelection(value);
+    updateQuantizationControls();
+  } else {
+    updateQuantizeOptionSelection(value);
+  }
+  if (closeMenu) {
+    closeQuantizeMenu(focusToggle);
   }
 }
 
 function openQuantizeMenu() {
-  if (isQuantizeMenuOpen || !quantizeModeList || !quantizeModeToggleBtn) return;
+  if (isQuantizeMenuOpen || !quantizeModeList || !quantizeToggleBtn) return;
   isQuantizeMenuOpen = true;
-  quantizeModeToggleBtn.setAttribute("aria-expanded", "true");
+  quantizeToggleBtn.setAttribute("aria-expanded", "true");
   quantizeModeList.classList.add("is-open");
   quantizeModeList.setAttribute("aria-hidden", "false");
   quantizeSelectWrapper?.classList.add("is-open");
   document.addEventListener("click", handleQuantizeOutsideClick);
   document.addEventListener("keydown", handleQuantizeGlobalKeydown);
-  const currentValue = quantizeModeSelect?.value ?? DEFAULT_QUANTIZE_MODE;
+  const currentValue = quantizeModeSelect?.value || NO_QUANTIZE_VALUE;
   const selectedIndex = quantizeOptionData.get(currentValue)?.index ?? 0;
   focusQuantizeOption(selectedIndex);
 }
@@ -1357,14 +1430,14 @@ function openQuantizeMenu() {
 function closeQuantizeMenu(focusToggle = false) {
   if (!isQuantizeMenuOpen) return;
   isQuantizeMenuOpen = false;
-  quantizeModeToggleBtn?.setAttribute("aria-expanded", "false");
+  quantizeToggleBtn?.setAttribute("aria-expanded", "false");
   quantizeModeList?.classList.remove("is-open");
   quantizeModeList?.setAttribute("aria-hidden", "true");
   quantizeSelectWrapper?.classList.remove("is-open");
   document.removeEventListener("click", handleQuantizeOutsideClick);
   document.removeEventListener("keydown", handleQuantizeGlobalKeydown);
-  if (focusToggle && quantizeModeToggleBtn && !quantizeModeToggleBtn.disabled) {
-    quantizeModeToggleBtn.focus();
+  if (focusToggle && quantizeToggleBtn && !quantizeToggleBtn.disabled) {
+    quantizeToggleBtn.focus();
   }
 }
 
@@ -1381,13 +1454,13 @@ function focusQuantizeOption(index) {
 }
 
 function handleQuantizeToggleKeydown(event) {
-  if (quantizeModeToggleBtn?.disabled) return;
+  if (quantizeToggleBtn?.disabled) return;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     if (!isQuantizeMenuOpen) {
       openQuantizeMenu();
     }
-    const currentValue = quantizeModeSelect?.value ?? DEFAULT_QUANTIZE_MODE;
+    const currentValue = quantizeModeSelect?.value || NO_QUANTIZE_VALUE;
     const selectedIndex = quantizeOptionData.get(currentValue)?.index ?? 0;
     focusQuantizeOption(selectedIndex);
   } else if (event.key === "Enter" || event.key === " ") {
@@ -1453,30 +1526,295 @@ function refreshQuantizationPreview() {
 function updateQuantizationControls() {
   if (!quantizeToggleBtn || !quantizeModeSelect) return;
   const hasEvents = recordedEvents.length > 0;
-  if (!hasEvents && isQuantizationEnabled) {
+  let selectedValue = quantizeModeSelect.value || NO_QUANTIZE_VALUE;
+  if (!hasEvents) {
+    selectedValue = NO_QUANTIZE_VALUE;
+    quantizeModeSelect.value = selectedValue;
     isQuantizationEnabled = false;
+  } else if (selectedValue !== NO_QUANTIZE_VALUE && !quantizeOptionData.has(selectedValue)) {
+    selectedValue = lastQuantizeMode && quantizeOptionData.has(lastQuantizeMode)
+      ? lastQuantizeMode
+      : DEFAULT_QUANTIZE_MODE;
+    quantizeModeSelect.value = selectedValue;
+    isQuantizationEnabled = selectedValue !== NO_QUANTIZE_VALUE;
+  } else {
+    isQuantizationEnabled = selectedValue !== NO_QUANTIZE_VALUE;
+  }
+  if (isQuantizationEnabled && selectedValue !== NO_QUANTIZE_VALUE) {
+    lastQuantizeMode = selectedValue;
   }
   quantizeToggleBtn.disabled = !hasEvents;
-  quantizeToggleBtn.textContent = "Raster";
   quantizeToggleBtn.setAttribute("aria-pressed", isQuantizationEnabled ? "true" : "false");
+  quantizeToggleBtn.setAttribute("aria-expanded", isQuantizeMenuOpen ? "true" : "false");
   quantizeToggleBtn.classList.toggle("is-active", isQuantizationEnabled);
-  const shouldDisableSelector = !hasEvents;
-  quantizeModeSelect.disabled = shouldDisableSelector;
-  if (quantizeModeToggleBtn) {
-    quantizeModeToggleBtn.disabled = shouldDisableSelector;
-  }
-  quantizeSelectWrapper?.classList.toggle("is-disabled", shouldDisableSelector);
-  if (shouldDisableSelector) {
+  quantizeToggleBtn.classList.toggle("is-off", !isQuantizationEnabled);
+  quantizeModeSelect.disabled = !hasEvents;
+  quantizeSelectWrapper?.classList.toggle("is-disabled", !hasEvents);
+  quantizeSelectWrapper?.classList.toggle("is-open", isQuantizeMenuOpen);
+  if (!hasEvents) {
     closeQuantizeMenu();
   }
-  updateQuantizeToggleDisplay(quantizeModeSelect.value || DEFAULT_QUANTIZE_MODE);
+  updateQuantizeOptionSelection(selectedValue);
+  updateQuantizeToggleDisplay(selectedValue);
 }
 
 function resetQuantizationState() {
   if (!quantizeToggleBtn || !quantizeModeSelect) return;
   isQuantizationEnabled = false;
+  quantizeModeSelect.value = NO_QUANTIZE_VALUE;
+  updateQuantizeOptionSelection(NO_QUANTIZE_VALUE);
   closeQuantizeMenu();
   updateQuantizationControls();
+}
+
+function handleMediaModalClick(event) {
+  if (!(event.target instanceof HTMLElement)) return;
+  if (event.target.dataset.mediaModalClose !== undefined) {
+    event.preventDefault();
+    closeTemplateMediaModal();
+  }
+}
+
+function handleMediaModalKeydown(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeTemplateMediaModal();
+  }
+}
+
+function handleMediaFileInput(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || !input.files?.length) {
+    return;
+  }
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    if (typeof reader.result === "string") {
+      pendingMediaDataUrl = reader.result;
+      updateMediaModalPreview();
+      updateMediaModalButtons();
+    }
+  });
+  reader.addEventListener("error", () => {
+    console.error("Bild konnte nicht gelesen werden.");
+  });
+  reader.readAsDataURL(file);
+}
+
+function updateMediaModalPreview() {
+  if (!mediaModalPreview) return;
+  mediaModalPreview.innerHTML = "";
+  if (!pendingMediaDataUrl) {
+    mediaModalPreview.textContent = "Noch kein Bild ausgewählt.";
+    return;
+  }
+  const img = document.createElement("img");
+  img.src = pendingMediaDataUrl;
+  img.alt = "Ausgewähltes Bild für das Overlay";
+  mediaModalPreview.appendChild(img);
+}
+
+function updateMediaModalButtons() {
+  const hasTemplate = activeTemplateIdForMedia !== null;
+  const hasImage = !!pendingMediaDataUrl;
+  if (mediaModalSaveBtn) {
+    mediaModalSaveBtn.disabled = !(hasTemplate && hasImage);
+  }
+  if (mediaModalShowBtn) {
+    mediaModalShowBtn.disabled = !(hasTemplate && hasImage);
+  }
+}
+
+function openTemplateMediaModal(templateId) {
+  const template = findTemplateById(templateId);
+  if (!template || !mediaModal) return;
+  activeTemplateIdForMedia = templateId;
+  pendingMediaDataUrl = template.overlayImage ?? null;
+  if (mediaModalFileInput) {
+    mediaModalFileInput.value = "";
+  }
+  updateMediaModalPreview();
+  updateMediaModalButtons();
+  mediaModal.classList.add("is-open");
+  mediaModal.setAttribute("aria-hidden", "false");
+  document.addEventListener("keydown", handleMediaModalKeydown);
+  mediaModalDialog?.focus();
+}
+
+function closeTemplateMediaModal() {
+  if (!mediaModal) return;
+  mediaModal.classList.remove("is-open");
+  mediaModal.setAttribute("aria-hidden", "true");
+  document.removeEventListener("keydown", handleMediaModalKeydown);
+  activeTemplateIdForMedia = null;
+  pendingMediaDataUrl = null;
+  updateMediaModalPreview();
+  updateMediaModalButtons();
+  if (mediaModalFileInput) {
+    mediaModalFileInput.value = "";
+  }
+}
+
+function handleMediaModalSave() {
+  if (activeTemplateIdForMedia === null || !pendingMediaDataUrl) return;
+  const template = findTemplateById(activeTemplateIdForMedia);
+  if (!template) return;
+  template.overlayImage = pendingMediaDataUrl;
+  if (!template.overlayPosition) {
+    template.overlayPosition = { ...DEFAULT_OVERLAY_POSITION };
+  }
+  renderTemplates();
+  renderPracticeQueue();
+  updateRecordingStatus(`Bild für "${template.name}" gespeichert.`);
+  closeTemplateMediaModal();
+}
+
+function handleMediaModalShow() {
+  if (activeTemplateIdForMedia === null || !pendingMediaDataUrl) return;
+  const template = findTemplateById(activeTemplateIdForMedia);
+  if (!template) return;
+  template.overlayImage = pendingMediaDataUrl;
+  if (!template.overlayPosition) {
+    template.overlayPosition = { ...DEFAULT_OVERLAY_POSITION };
+  }
+  renderTemplates();
+  renderPracticeQueue();
+  closeTemplateMediaModal();
+  showTemplateImageOverlay(template.id);
+  updateRecordingStatus(`Overlay für "${template.name}" geöffnet.`);
+}
+
+function showTemplateImageOverlay(templateId) {
+  if (!imageOverlayContainer) return;
+  const template = findTemplateById(templateId);
+  if (!template?.overlayImage) {
+    updateRecordingStatus("Bitte zuerst ein Bild auswählen.");
+    return;
+  }
+
+  hideTemplateImageOverlay(templateId);
+
+  const overlay = document.createElement("div");
+  overlay.className = "template-image-overlay";
+  overlay.dataset.templateOverlay = templateId;
+
+  const header = document.createElement("div");
+  header.className = "template-image-overlay__header";
+  const title = document.createElement("span");
+  title.className = "template-image-overlay__title";
+  title.textContent = template.name;
+  header.appendChild(title);
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "template-image-overlay__close";
+  closeBtn.setAttribute("aria-label", "Overlay schließen");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", () => hideTemplateImageOverlay(templateId));
+  header.appendChild(closeBtn);
+  overlay.appendChild(header);
+
+  const body = document.createElement("div");
+  body.className = "template-image-overlay__body";
+  const img = document.createElement("img");
+  img.src = template.overlayImage;
+  img.alt = `Overlay für Vorlage ${template.name}`;
+  body.appendChild(img);
+  overlay.appendChild(body);
+
+  imageOverlayContainer.appendChild(overlay);
+  activeImageOverlays.set(templateId, overlay);
+  setOverlayPosition(overlay, template.overlayPosition?.x ?? DEFAULT_OVERLAY_POSITION.x, template.overlayPosition?.y ?? DEFAULT_OVERLAY_POSITION.y);
+  persistOverlayPosition(overlay, templateId);
+  makeOverlayDraggable(overlay, templateId);
+  renderPracticeQueue();
+}
+
+function hideTemplateImageOverlay(templateId) {
+  const overlay = activeImageOverlays.get(templateId);
+  if (!overlay) return;
+  overlay.remove();
+  activeImageOverlays.delete(templateId);
+  renderPracticeQueue();
+}
+
+function setOverlayPosition(overlay, left, top) {
+  overlay.style.left = `${left}px`;
+  overlay.style.top = `${top}px`;
+  const rect = overlay.getBoundingClientRect();
+  const { left: clampedLeft, top: clampedTop } = clampOverlayPosition(rect.width, rect.height, rect.left, rect.top);
+  overlay.style.left = `${clampedLeft}px`;
+  overlay.style.top = `${clampedTop}px`;
+  return { left: clampedLeft, top: clampedTop };
+}
+
+function clampOverlayPosition(width, height, left, top) {
+  const maxLeft = Math.max(OVERLAY_EDGE_PADDING, window.innerWidth - width - OVERLAY_EDGE_PADDING);
+  const maxTop = Math.max(OVERLAY_EDGE_PADDING, window.innerHeight - height - OVERLAY_EDGE_PADDING);
+  return {
+    left: Math.min(Math.max(left, OVERLAY_EDGE_PADDING), maxLeft),
+    top: Math.min(Math.max(top, OVERLAY_EDGE_PADDING), maxTop)
+  };
+}
+
+function makeOverlayDraggable(overlay, templateId) {
+  const handle = overlay.querySelector(".template-image-overlay__header");
+  if (!handle) return;
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let originLeft = 0;
+  let originTop = 0;
+  let overlayWidth = 0;
+  let overlayHeight = 0;
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) {
+      return;
+    }
+    event.preventDefault();
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = overlay.getBoundingClientRect();
+    originLeft = rect.left;
+    originTop = rect.top;
+    overlayWidth = rect.width;
+    overlayHeight = rect.height;
+    overlay.classList.add("is-dragging");
+    handle.setPointerCapture(pointerId);
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    const desiredLeft = originLeft + deltaX;
+    const desiredTop = originTop + deltaY;
+    const { left, top } = clampOverlayPosition(overlayWidth, overlayHeight, desiredLeft, desiredTop);
+    overlay.style.left = `${left}px`;
+    overlay.style.top = `${top}px`;
+  });
+
+  function releasePointer(event) {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    handle.releasePointerCapture(pointerId);
+    overlay.classList.remove("is-dragging");
+    pointerId = null;
+    persistOverlayPosition(overlay, templateId);
+  }
+
+  handle.addEventListener("pointerup", releasePointer);
+  handle.addEventListener("pointercancel", releasePointer);
+}
+
+function persistOverlayPosition(overlay, templateId) {
+  const template = findTemplateById(templateId);
+  if (!template) return;
+  const left = parseFloat(overlay.style.left) || DEFAULT_OVERLAY_POSITION.x;
+  const top = parseFloat(overlay.style.top) || DEFAULT_OVERLAY_POSITION.y;
+  template.overlayPosition = { x: left, y: top };
 }
 
 function scheduleTone(ctx, note, when, duration, destination, highlightMs) {
@@ -1528,7 +1866,20 @@ function initializeTemplates() {
     id: `default-${index}`,
     name: tpl.name,
     description: tpl.description,
-    events: tpl.events ? tpl.events.map((event) => ({ ...event })) : []
+    events: tpl.events ? tpl.events.map((event) => ({ ...event })) : [],
+    overlayImage: tpl.overlayImage ?? null,
+    overlayPosition: tpl.overlayPosition
+      ? {
+          x:
+            typeof tpl.overlayPosition.x === "number"
+              ? tpl.overlayPosition.x
+              : DEFAULT_OVERLAY_POSITION.x,
+          y:
+            typeof tpl.overlayPosition.y === "number"
+              ? tpl.overlayPosition.y
+              : DEFAULT_OVERLAY_POSITION.y
+        }
+      : { ...DEFAULT_OVERLAY_POSITION }
   }));
   renderTemplates();
   renderPracticeQueue();
@@ -1562,17 +1913,31 @@ function renderTemplates() {
       playTemplatePreview(template);
     });
 
+    const mediaBtn = document.createElement("button");
+    mediaBtn.type = "button";
+    mediaBtn.className = "template-card__icon-btn template-card__icon-btn--media";
+    mediaBtn.setAttribute("aria-label", `Bild für Vorlage ${template.name} hinzufügen oder anzeigen`);
+    const mediaIcon = createButtonIcon(MEDIA_ICON_SRC, "template-card__icon-img");
+    mediaBtn.appendChild(mediaIcon);
+    if (template.overlayImage) {
+      mediaBtn.classList.add("is-active");
+    }
+    mediaBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openTemplateMediaModal(template.id);
+    });
+
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "template-card__icon-btn template-card__icon-btn--delete";
     deleteBtn.setAttribute("aria-label", `Vorlage ${template.name} löschen`);
-    deleteBtn.innerHTML = '<img src="./assets/images/trash-white32.png" alt="Melopoiia Logo" />';
+    deleteBtn.innerHTML = `<img src="./assets/images/trash-white32.png" alt="Melopoiia Logo" />`;
     deleteBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       handleTemplateDelete(template.id);
     });
 
-    actionsEl.append(playBtn, deleteBtn);
+    actionsEl.append(playBtn, mediaBtn, deleteBtn);
     header.append(nameEl, actionsEl);
     card.append(header);
 
@@ -1612,6 +1977,8 @@ function renderPracticeQueue() {
     item.className = "practice-queue__item";
     item.dataset.queueId = entry.id;
 
+    const template = findTemplateById(entry.templateId);
+
     const nameEl = document.createElement("p");
     nameEl.className = "practice-queue__name";
     nameEl.textContent = entry.name;
@@ -1619,11 +1986,28 @@ function renderPracticeQueue() {
     const actionsEl = document.createElement("div");
     actionsEl.className = "practice-queue__actions";
 
+    if (template?.overlayImage) {
+      const overlayBtn = document.createElement("button");
+      overlayBtn.type = "button";
+      overlayBtn.className = "practice-queue__btn practice-queue__btn--overlay";
+      overlayBtn.setAttribute("aria-label", `Overlay für ${entry.name} anzeigen`);
+      const overlayIcon = createButtonIcon(OVERLAY_ICON_SRC, "practice-queue__overlay-icon");
+      overlayBtn.appendChild(overlayIcon);
+      if (template && activeImageOverlays.has(template.id)) {
+        overlayBtn.classList.add("is-active");
+      }
+      overlayBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        showTemplateImageOverlay(template.id);
+      });
+      actionsEl.appendChild(overlayBtn);
+    }
+
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "practice-queue__btn practice-queue__btn--remove";
     removeBtn.setAttribute("aria-label", `${entry.name} aus Übung entfernen`);
-    removeBtn.textContent = "✕";
+    removeBtn.textContent = "X";
     removeBtn.addEventListener("click", () => removePracticeQueueItem(index));
     actionsEl.append(removeBtn);
 
@@ -1685,6 +2069,7 @@ function handlePracticeQueueDragLeave(event) {
 function handlePracticeQueueDrop(event) {
   if (isQueueDrag(event)) {
     event.preventDefault();
+    event.stopPropagation();
     const target = event.currentTarget;
     if (target && target.classList) {
       target.classList.remove("is-drag-over");
@@ -1702,6 +2087,7 @@ function handlePracticeQueueDrop(event) {
   }
   if (!isTemplateDrag(event)) return;
   event.preventDefault();
+  event.stopPropagation();
   const target = event.currentTarget;
   if (target && target.classList) {
     target.classList.remove("is-drag-over");
